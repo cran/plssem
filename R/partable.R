@@ -1,0 +1,91 @@
+CI_QUANTILE <- qnorm(0.05)
+
+
+getParTableEstimates <- function(model, rm.tmp = TRUE) {
+  params <- model$params
+  est    <- model$params$values
+  se     <- model$params$se
+  names  <- names(est)
+
+  split    <- splitParameterNames(names)
+  lhs      <- split$lhs
+  op       <- split$op
+  rhs      <- split$rhs
+  z        <- est / se
+  pvalue   <- 2 * stats::pnorm(-abs(z))
+  ci.lower <- est - CI_QUANTILE * z
+  ci.upper <- est + CI_QUANTILE * z
+
+  parTable <- data.frame(
+    lhs      = lhs,
+    op       = op,
+    rhs      = rhs,
+    est      = est,
+    se       = se,
+    z        = z,
+    pvalue   = pvalue,
+    ci.lower = ci.lower,
+    ci.upper = ci.upper
+  )
+
+  if (rm.tmp)
+    parTable <- removeTempOV_RowsParTable(parTable)
+
+  plssemParTable(parTable)
+}
+
+
+splitParameterNames <- function(names) {
+  hasBeenSplit <- logical(length(names))
+
+  lhs <- rep(NA_character_, length(names))
+  op  <- rep(NA_character_, length(names))
+  rhs <- rep(NA_character_, length(names))
+
+  for (OP in OPERATORS) { # go by precedence
+    split <- stringr::str_split_fixed(names, pattern = stringr::coll(OP), n = 2L)
+    success <- stringr::str_detect(names, pattern = stringr::coll(OP))
+
+    replace <- !hasBeenSplit & success
+    hasBeenSplit <- hasBeenSplit | success
+
+    lhs[replace] <- split[replace, 1L]
+    rhs[replace] <- split[replace, 2L]
+    op[replace]  <- OP
+  }
+
+  list(lhs = lhs, op = op, rhs = rhs)
+}
+
+
+removeTempOV_RowsParTable <- function(parTable) {
+  tmp <- startsWith(parTable$lhs, TEMP_OV_PREFIX) | startsWith(parTable$rhs, TEMP_OV_PREFIX)
+  parTable[!tmp, , drop = FALSE]
+}
+  
+
+addColonPI_ParTable <- function(parTable, model, label.renamed.prod = FALSE) {
+  elems <- model$info$intTermElems
+
+  if (length(elems) && !"label" %in% colnames(parTable))
+    parTable$label <- ""
+
+  if (label.renamed.prod)
+    origLabels <- getParTableLabels(parTable, labelCol = "label")
+  else
+    origLabels <- parTable$label
+
+  for (xz in names(elems)) {
+    xzColon <- paste0(elems[[xz]], collapse = ":")
+    rmatch <- parTable$rhs == xz
+    lmatch <- parTable$lhs == xz
+
+    parTable[rmatch | lmatch, "label"] <- origLabels[rmatch | lmatch]
+
+    parTable[rmatch, "rhs"] <- xzColon
+    parTable[lmatch, "lhs"] <- xzColon # shouldn't be necessary, but just in case
+                                       # the user has done something weird...
+  }
+
+  parTable
+}
