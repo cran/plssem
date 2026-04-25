@@ -10,12 +10,18 @@ pls(
   standardize = TRUE,
   consistent = TRUE,
   bootstrap = FALSE,
-  sample = 50L,
   ordered = NULL,
+  missing = c("listwise", "mean", "kNN"),
+  knn.k = 5,
   mcpls = NULL,
   probit = NULL,
   tolerance = 1e-05,
   max.iter.0_5 = 100L,
+  boot.ncpus = 1L,
+  boot.parallel = c("no", "multicore", "snow"),
+  boot.R = 50L,
+  boot.iseed = NULL,
+  sample = NULL,
   mc.min.iter = 5L,
   mc.max.iter = 250L,
   mc.reps = 20000L,
@@ -24,32 +30,48 @@ pls(
   mc.polyak.juditsky = FALSE,
   mc.fn.args = list(),
   verbose = interactive(),
+  boot.optimize = TRUE,
+  mc.boot.control = list(min.iter = mc.min.iter, max.iter = mc.max.iter, mc.reps =
+    floor(0.5 * mc.reps), tol = 2 * mc.tol, polyak.juditsky = FALSE, verbose = FALSE,
+    fixed.seed = TRUE, reuse.p.start = TRUE),
+  reliabilities = NULL,
   ...
 )
 }
 \arguments{
-\item{syntax}{Character string with `lavaan`-style model syntax describing
-both measurement (`=~`) and structural (`~`) relations. Random effects are
-specified with `(term | cluster)` statements.}
+\item{syntax}{Character string with \code{lavaan}-style model syntax describing
+both measurement (\code{=~}) and structural (\code{~}) relations. Random effects are
+specified with \code{(term | cluster)} statements.}
 
-\item{data}{A `data.frame` or coercible object containing the manifest
-indicators referenced in `syntax`. Ordered factors are automatically
-detected, but can also be supplied explicitly through `ordered`.}
+\item{data}{A \code{data.frame} or coercible object containing the manifest
+indicators referenced in \code{syntax}. Ordered factors are automatically
+detected, but can also be supplied explicitly through \code{ordered}.}
 
-\item{standardize}{Logical; if `TRUE`, indicators are standardized before
+\item{standardize}{Logical; if \code{TRUE}, indicators are standardized before
 estimation so that factor scores have comparable scales.}
 
-\item{consistent}{Logical; `TRUE` requests PLSc corrections, whereas `FALSE`
+\item{consistent}{Logical; \code{TRUE} requests PLSc corrections, whereas \code{FALSE}
 fits the traditional PLS model.}
 
-\item{bootstrap}{Logical; if `TRUE`, nonparametric bootstrap standard errors
-are computed with `sample` resamples.}
-
-\item{sample}{Integer giving the number of bootstrap resamples drawn when
-`bootstrap = TRUE`.}
+\item{bootstrap}{Logical; if \code{TRUE}, nonparametric bootstrap standard errors
+are computed with \code{boot.R} resamples.}
 
 \item{ordered}{Optional character vector naming manifest indicators that
 should be treated as ordered when computing polychoric correlations.}
+
+\item{missing}{Character string specifying how to handle missing indicator data.
+\code{"listwise"} removes rows with missing values (listwise deletion).
+\code{"mean"} imputes missing indicator values using simple univariate
+imputation: the mean for continuous variables, the median for ordered variables
+with more than two categories, and the mode for binary ordered variables (two
+categories) or nominal variables.
+\code{"kNN"} (or \code{"knn"}) imputes missing indicator values using
+k-nearest neighbors imputation (kNN). When \code{missing = "kNN"}, rows with
+all indicators missing are removed prior to imputation, and rows with missing
+\code{cluster} values are removed for multilevel models.}
+
+\item{knn.k}{Integer specifying the number of neighbors (\code{k}) used when
+\code{missing = "kNN"}.}
 
 \item{mcpls}{Should a Monte-Carlo consistency correction be applied?}
 
@@ -60,6 +82,26 @@ that is based on whether ordered indicators are present.}
 
 \item{max.iter.0_5}{Maximum number of PLS iterations performed when estimating
 the measurement and structural models.}
+
+\item{boot.ncpus}{Integer: number of processes to be used in parallel operation.
+By default this is the number of cores (as detected by \code{parallel::detectCores()}) minus one.}
+
+\item{boot.parallel}{The type of parallel operation to be used (if any). If missing,
+the default is \code{"no"}.}
+
+\item{boot.R}{Integer giving the number of bootstrap resamples drawn when
+\code{bootstrap = TRUE}.}
+
+\item{boot.iseed}{An integer to set the bootstrap seed. Or \code{NULL} if no
+reproducible results are needed. This works for both serial (non-parallel) and
+parallel settings. Internally, \code{RNGkind()} is set to \code{"L'Ecuyer-CMRG"}
+if \code{parallel = "multicore"}. If \code{parallel = "snow"} (under windows),
+\code{parallel::clusterSetRNGStream()} is called which automatically switches to
+\code{"L'Ecuyer-CMRG"}. When iseed is not \code{NULL}, \code{.Random.seed}
+(if it exists) in the global environment is left untouched.}
+
+\item{sample}{DEPRECTATED. Integer giving the number of bootstrap resamples drawn when
+\code{bootstrap = TRUE}.}
 
 \item{mc.min.iter}{Minimum number of iterations in MC-PLS algorithm.}
 
@@ -79,19 +121,33 @@ the step size.}
 
 \item{verbose}{Should verbose output be printed?}
 
-\item{...}{Currently unused, reserved for future extensions.}
+\item{boot.optimize}{Logical; if \code{TRUE} and \code{bootstrap = TRUE}, applies
+the settings in \code{mc.boot.control} inside each bootstrap replicate (MC-PLS only).}
+
+\item{mc.boot.control}{List of control parameters passed to the MC-PLS algorithm
+inside each bootstrap replicate when \code{boot.optimize = TRUE}. This can be used
+to speed up bootstrapping by, for example, increasing the tolerance or reducing
+\code{mc.reps}. The element \code{reuse.p.start} controls whether to reuse the
+original \code{p.start} for the bootstrap replicates.}
+
+\item{reliabilities}{Optional named numeric vector of user-supplied reliabilities
+used for the PLSc consistency correction. Values are interpreted as construct
+reliabilities (i.e., squared construct quality, \eqn{Q^2}) for the named
+constructs. These override the internally computed construct qualities.}
+
+\item{...}{Internal arguments. For advanced users only.}
 }
 \value{
-An object of class `plssem` containing the estimated parameters, fit
+An object of class \code{plssem} containing the estimated parameters, fit
   measures, factor scores, and any bootstrap results. Methods such as
-  `summary()`, `print()`, and `coef()` can be applied to inspect the fit.
+  \code{summary()}, \code{print()}, and \code{coef()} can be applied to inspect the fit.
 }
 \description{
-`pls()` estimates Partial Least Squares Structural Equation Models (PLS-SEM)
-and their consistent (PLSc) variants. The function accepts `lavaan`-style
+\code{pls()} estimates Partial Least Squares Structural Equation Models (PLS-SEM)
+and their consistent (PLSc) variants. The function accepts \code{lavaan}-style
 syntax, handles ordered indicators through polychoric correlations and probit
 factor scores, and supports multilevel specifications expressed with
-`lme4`-style random effects terms inside the structural model.
+\code{lme4}-style random effects terms inside the structural model.
 }
 \examples{
 # Linear Model with Continuous Data

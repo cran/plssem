@@ -1,21 +1,16 @@
 TEMP_OV_PREFIX <- ".TEMP_OV__"
 
 
-parseModelArguments <- function(syntax,
+parseModelArguments <- function(parTable,
                                 data,
-                                pi.match = NULL,
-                                pi.match.recycle = NULL,
                                 ordered = NULL,
                                 probit = NULL,
                                 mcpls = FALSE,
-                                consistent = TRUE) {
-  stopif(length(syntax) > 1L || !is.character(syntax),
-         "`syntax` must be a string of length 1!")
+                                consistent = TRUE,
+                                is.lower.order = FALSE) {
+  data <- as.data.frame(data)
 
-  parTable <- modsem::modsemify(syntax, parentheses.as.string = TRUE)
-  data     <- as.data.frame(data)
-
-  intTermNames <- unique(parTable[grepl(":", parTable$rhs), "rhs"])
+  intTermNames <- getIntTerms(parTable)
   intTermElems <- stringr::str_split(intTermNames, pattern = ":")
   names(intTermElems)  <- intTermNames
   is.nlin <- length(intTermElems) > 0L
@@ -30,6 +25,7 @@ parseModelArguments <- function(syntax,
   ovs       <- ovs[!grepl("\\(|\\)", ovs)]
 
   vars       <- intersect(ovs, colnames(data))
+  data       <- checkAndFixDTypesPLS_Data(data, check = vars)
   is.ordered <- vapply(data[vars], FUN.VALUE = logical(1L), FUN = is.ordered)
   ordered    <- intersect(union(ordered, vars[is.ordered]), vars)
 
@@ -49,15 +45,15 @@ parseModelArguments <- function(syntax,
     data[[tmp.ov]] <- data[[ov]]
     parTable <- rbind(
       parTable,
-      data.frame(lhs = ov, op = "<~", rhs = tmp.ov, mod = "1")
+      data.frame(lhs = ov, op = "<~", rhs = tmp.ov, mod = "")
     )
   }
 
   syntax <- parTableToSyntax(parTable)
 
-  isMultilevel <- grepl("\\(.*\\|.*\\)", parTable$rhs) & parTable$op == "~"
+  isMultilevel <- grepl("\\(.*\\|.*\\)", parTable$rhs) & parTable$op %in% c("~", "~~")
   if (any(isMultilevel)) {
-    multilevelEtas <- unique(parTable[isMultilevel, "lhs"])
+    multilevelEtas <- unique(parTable[isMultilevel & parTable$op == "~", "lhs"])
     lme4.syntax <- character(0L)
 
     for (eta in multilevelEtas) {
@@ -78,8 +74,9 @@ parseModelArguments <- function(syntax,
     lme4.syntax <- NULL
   }
 
-  is.mcpls  <- if (is.null(mcpls)) length(ordered) > 0L && is.nlin else mcpls
-  is.probit <- if (is.null(probit)) length(ordered) > 0L && !is.mcpls else probit
+  has.ord <- length(ordered) > 0L
+  is.mcpls  <- if (is.null(mcpls)) has.ord && (is.nlin || is.lower.order) else mcpls
+  is.probit <- if (is.null(probit)) has.ord && !is.mcpls else probit
   is.mlm    <- length(lme4.syntax) > 0L
 
   list(

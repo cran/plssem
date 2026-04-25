@@ -21,7 +21,7 @@ fit_slopes_cont <- pls(
   slopes_model,
   data      = randomSlopes,
   bootstrap = TRUE,
-  sample    = 50
+  boot.R    = 50
 )
 summary(fit_slopes_cont)
 
@@ -30,7 +30,7 @@ fit_slopes_ord <- pls(
   slopes_model,
   data      = randomSlopesOrdered,
   bootstrap = TRUE,
-  sample    = 50,
+  boot.R    = 50,
   ordered   = colnames(randomSlopesOrdered) # explicitly specify variables as ordered
 )
 summary(fit_slopes_ord)
@@ -46,7 +46,7 @@ fit_intercepts_cont <- pls(
   intercepts_model,
   data      = randomIntercepts,
   bootstrap = TRUE,
-  sample    = 50
+  boot.R    = 50
 )
 summary(fit_intercepts_cont)
 
@@ -55,7 +55,7 @@ fit_intercepts_ord <- pls(
   intercepts_model,
   data      = randomInterceptsOrdered,
   bootstrap = TRUE,
-  sample    = 50,
+  boot.R    = 50,
   ordered   = colnames(randomInterceptsOrdered) # explicitly specify variables as ordered
 )
 summary(fit_intercepts_ord)

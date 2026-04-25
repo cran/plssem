@@ -1,16 +1,17 @@
-#' Summarize a fitted `plssem` model
+#' Summarize a fitted \code{plssem} model
 #'
-#' @param object An object of class `plssem`.
+#' @param object An object of class \code{plssem}.
+#' @param fit Should fit measures be calculated?
 #' @param ... Additional arguments passed to or from methods.
-#' @return A `SummaryPlsSem` object containing formatted parameter estimates.
+#' @return A \code{SummaryPlsSem} object containing formatted parameter estimates.
 #'
 #' @export
-summary.plssem <- function(object, ...) {
-  parTable    <- parameter_estimates(object)
+summary.plssem <- function(object, fit = TRUE, ...) {
+  parTable <- parameter_estimates(object)
 
   lvs <- getLVs(parTable)
   ovs <- getOVs(parTable)
-  etas <- getEtas(parTable)
+  etas <- getEtas(parTable, checkAny=FALSE)
   inds <- getIndicators(parTable)
   inds.a <- getReflectiveIndicators(parTable)
 
@@ -48,7 +49,8 @@ summary.plssem <- function(object, ...) {
     r2 = list(
       etas = r2.etas,
       inds = r2.inds
-    )
+    ),
+    fit.measures = if (fit) fitMeasures(object) else NULL
   )
 
   class(out) <- "SummaryPlsSem"
@@ -56,9 +58,9 @@ summary.plssem <- function(object, ...) {
 }
 
 
-#' Print a `SummaryPlsSem` object
+#' Print a \code{SummaryPlsSem} object
 #'
-#' @param x A `SummaryPlsSem` object as returned by [summary.plssem()].
+#' @param x A \code{SummaryPlsSem} object as returned by [summary.plssem()].
 #' @param ... Additional arguments for compatibility with the generic.
 #' @return The input object, invisibly.
 #'
@@ -97,30 +99,54 @@ print.SummaryPlsSem <- function(x, ...) {
   cat(allignLhsRhs(lhs = headerNames, rhs = headerValues, pad = "  ",
                    width.out = width.out), "\n", sep = "")
 
-  cat("R-squared (indicators):\n")
+  if (!is.null(x$fit.measures)) {
+    cat("Fit Measures:\n")
+    headerNames <- c(
+      "Chi-Square",
+      "Degrees of Freedom",
+      "SRMR",
+      "RMSEA"
+    )
 
-  headerNames <- names(x$r2$inds)
-  headerValues <- formatNumeric(x$r2$inds)
+    headerValues <- c(
+      sprintf("%.3f", x$fit.measures$chisq),
+      sprintf("%d", x$fit.measures$chisq.df),
+      sprintf("%.3f", x$fit.measures$srmr),
+      sprintf("%.3f", x$fit.measures$rmsea)
+    )
 
-  cat(allignLhsRhs(lhs = headerNames, rhs = headerValues, pad = "  ",
-                   width.out = width.out), "\n", sep = "")
+    cat(allignLhsRhs(lhs = headerNames, rhs = headerValues, pad = "  ",
+                     width.out = width.out), "\n", sep = "")
+  }
 
-  cat("R-squared (latents):\n")
+  if (length(x$r2$inds)) {
+    cat("R-squared (indicators):\n")
 
-  headerNames <- names(x$r2$etas)
-  headerValues <- formatNumeric(x$r2$etas)
+    headerNames <- names(x$r2$inds)
+    headerValues <- formatNumeric(x$r2$inds)
 
-  cat(allignLhsRhs(lhs = headerNames, rhs = headerValues, pad = "  ",
-                   width.out = width.out), "\n", sep = "")
+    cat(allignLhsRhs(lhs = headerNames, rhs = headerValues, pad = "  ",
+                     width.out = width.out), "\n", sep = "")
+  }
+
+  if (length(x$r2$etas)) {
+    cat("R-squared (latents):\n")
+
+    headerNames <- names(x$r2$etas)
+    headerValues <- formatNumeric(x$r2$etas)
+
+    cat(allignLhsRhs(lhs = headerNames, rhs = headerValues, pad = "  ",
+                     width.out = width.out), "\n", sep = "")
+  }
 
   cat(x$print$strParTable)
   invisible(x)
 }
 
 
-#' Print a `plssem` object
+#' Print a \code{plssem} object
 #'
-#' @param x An object of class `plssem`.
+#' @param x An object of class \code{plssem}.
 #' @param ... Additional arguments for compatibility with the generic.
 #' @return The input object, invisibly.
 #'
@@ -133,9 +159,30 @@ print.plssem <- function(x, ...) {
 }
 
 
-#' Parameter estimates for `plssem` objects
+#' @export
+#' @importFrom stats coefficients
+coefficients.plssem <- function(object, ...) {
+  plssemVector(object$params$values, is.public = TRUE)
+}
+
+
+#' @export
+#' @importFrom stats coef
+coef.plssem <- function(object, ...) {
+  coefficients.plssem(object, ...)
+}
+
+
+#' @export
+#' @importFrom stats vcov
+vcov.plssem <- function(object, ...) {
+  plssemMatrix(object$params$vcov, is.public = TRUE)
+}
+
+
+#' Parameter estimates for \code{plssem} objects
 #'
-#' @param object An object of class `plssem`.
+#' @param object An object of class \code{plssem}.
 #' @param colon.pi Logical; whether to replace labels for interaction terms with colon notation.
 #' @param label.renamed.prod Logical; whether renamed product labels should be retained when colon expansion occurs.
 #' @param ... Additional arguments (not used).
@@ -165,4 +212,52 @@ parameter_estimates.plssem <- function(object,
 #' @export
 parameter_estimates <- function(object, ...) {
   UseMethod("parameter_estimates")
+}
+
+
+#' @export
+isMC_PLS.plssem <- function(object) {
+  object$info$is.mcpls 
+}
+
+
+#' Check if object is a MC-PLS model
+#'
+#' @param object A fitted model object.
+#' @return \code{TRUE}/\code{FALSE}.
+#'
+#' @export
+isMC_PLS <- function(object) {
+  UseMethod("isMC_PLS")
+}
+
+
+#' Get bootstrapped coefficients from PLS model
+#'
+#' @param object A fitted model object.
+#' @return Matrix with bootstrapped coefficients.
+#'
+#' @examples
+#' library(modsem)
+#' library(plssem)
+#'
+#' m <- "
+#'   X =~ x1 + x2 + x3
+#'   Z =~ z1 + z2 + z3
+#'   Y =~ y1 + y2 + y3
+#'   Y ~ X + Z + X:Z
+#' "
+#' 
+#' fit <- pls(m, oneInt, bootstrap = TRUE, boot.R = 50)
+#' boot(fit)
+#' 
+#' @export
+boot <- function(object) {
+  UseMethod("boot")
+}
+
+
+#' @export
+boot.plssem <- function(object) {
+  plssemMatrix(object$boot$boot, is.public = TRUE)
 }

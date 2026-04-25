@@ -3,44 +3,75 @@ USE_NON_LINEAR_PROBIT_CORR_MAT <- FALSE # for now we stick with the linear assum
 
 #' Fit Partial Least Squares Structural Equation Models
 #'
-#' `pls()` estimates Partial Least Squares Structural Equation Models (PLS-SEM)
-#' and their consistent (PLSc) variants. The function accepts `lavaan`-style
+#' \code{pls()} estimates Partial Least Squares Structural Equation Models (PLS-SEM)
+#' and their consistent (PLSc) variants. The function accepts \code{lavaan}-style
 #' syntax, handles ordered indicators through polychoric correlations and probit
 #' factor scores, and supports multilevel specifications expressed with
-#' `lme4`-style random effects terms inside the structural model.
+#' \code{lme4}-style random effects terms inside the structural model.
 #'
-#' @param syntax Character string with `lavaan`-style model syntax describing
-#'   both measurement (`=~`) and structural (`~`) relations. Random effects are
-#'   specified with `(term | cluster)` statements.
+#' @param syntax Character string with \code{lavaan}-style model syntax describing
+#'   both measurement (\code{=~}) and structural (\code{~}) relations. Random effects are
+#'   specified with \code{(term | cluster)} statements.
 #'
-#' @param data A `data.frame` or coercible object containing the manifest
-#'   indicators referenced in `syntax`. Ordered factors are automatically
-#'   detected, but can also be supplied explicitly through `ordered`.
+#' @param data A \code{data.frame} or coercible object containing the manifest
+#'   indicators referenced in \code{syntax}. Ordered factors are automatically
+#'   detected, but can also be supplied explicitly through \code{ordered}.
 #'
-#' @param standardize Logical; if `TRUE`, indicators are standardized before
+#' @param standardize Logical; if \code{TRUE}, indicators are standardized before
 #'   estimation so that factor scores have comparable scales.
 #'
-#' @param max.iter.0_5 Maximum number of PLS iterations performed when estimating
-#'   the measurement and structural models.
-#'
-#' @param consistent Logical; `TRUE` requests PLSc corrections, whereas `FALSE`
+#' @param consistent Logical; \code{TRUE} requests PLSc corrections, whereas \code{FALSE}
 #'   fits the traditional PLS model.
 #'
-#' @param bootstrap Logical; if `TRUE`, nonparametric bootstrap standard errors
-#'   are computed with `sample` resamples.
-#'
-#' @param sample Integer giving the number of bootstrap resamples drawn when
-#'   `bootstrap = TRUE`.
+#' @param bootstrap Logical; if \code{TRUE}, nonparametric bootstrap standard errors
+#'   are computed with \code{boot.R} resamples.
 #'
 #' @param ordered Optional character vector naming manifest indicators that
 #'   should be treated as ordered when computing polychoric correlations.
 #'
-#' @param probit Logical; overrides the automatic choice of probit factor scores
-#'   that is based on whether ordered indicators are present.
+#' @param missing Character string specifying how to handle missing indicator data.
+#'   \code{"listwise"} removes rows with missing values (listwise deletion).
+#'   \code{"mean"} imputes missing indicator values using simple univariate
+#'   imputation: the mean for continuous variables, the median for ordered variables
+#'   with more than two categories, and the mode for binary ordered variables (two
+#'   categories) or nominal variables.
+#'   \code{"kNN"} (or \code{"knn"}) imputes missing indicator values using
+#'   k-nearest neighbors imputation (kNN). When \code{missing = "kNN"}, rows with
+#'   all indicators missing are removed prior to imputation, and rows with missing
+#'   \code{cluster} values are removed for multilevel models.
+#'
+#' @param knn.k Integer specifying the number of neighbors (\code{k}) used when
+#'   \code{missing = "kNN"}.
 #'
 #' @param mcpls Should a Monte-Carlo consistency correction be applied?
 #'
+#' @param probit Logical; overrides the automatic choice of probit factor scores
+#'   that is based on whether ordered indicators are present.
+#'
 #' @param tolerance Numeric; Convergence criteria/tolerance.
+#'
+#' @param max.iter.0_5 Maximum number of PLS iterations performed when estimating
+#'   the measurement and structural models.
+#'
+#' @param boot.ncpus Integer: number of processes to be used in parallel operation.
+#'   By default this is the number of cores (as detected by \code{parallel::detectCores()}) minus one.
+#'
+#' @param boot.parallel The type of parallel operation to be used (if any). If missing,
+#'   the default is \code{"no"}.
+#'
+#' @param boot.R Integer giving the number of bootstrap resamples drawn when
+#'   \code{bootstrap = TRUE}.
+#'
+#' @param boot.iseed An integer to set the bootstrap seed. Or \code{NULL} if no
+#'   reproducible results are needed. This works for both serial (non-parallel) and
+#'   parallel settings. Internally, \code{RNGkind()} is set to \code{"L'Ecuyer-CMRG"}
+#'   if \code{parallel = "multicore"}. If \code{parallel = "snow"} (under windows),
+#'   \code{parallel::clusterSetRNGStream()} is called which automatically switches to
+#'   \code{"L'Ecuyer-CMRG"}. When iseed is not \code{NULL}, \code{.Random.seed}
+#'   (if it exists) in the global environment is left untouched.
+#'
+#' @param sample DEPRECTATED. Integer giving the number of bootstrap resamples drawn when
+#'   \code{bootstrap = TRUE}.
 #'
 #' @param mc.min.iter Minimum number of iterations in MC-PLS algorithm.
 #'
@@ -60,11 +91,25 @@ USE_NON_LINEAR_PROBIT_CORR_MAT <- FALSE # for now we stick with the linear assum
 #'
 #' @param verbose Should verbose output be printed?
 #'
-#' @param ... Currently unused, reserved for future extensions.
+#' @param boot.optimize Logical; if \code{TRUE} and \code{bootstrap = TRUE}, applies
+#'   the settings in \code{mc.boot.control} inside each bootstrap replicate (MC-PLS only).
 #'
-#' @return An object of class `plssem` containing the estimated parameters, fit
+#' @param mc.boot.control List of control parameters passed to the MC-PLS algorithm
+#'   inside each bootstrap replicate when \code{boot.optimize = TRUE}. This can be used
+#'   to speed up bootstrapping by, for example, increasing the tolerance or reducing
+#'   \code{mc.reps}. The element \code{reuse.p.start} controls whether to reuse the
+#'   original \code{p.start} for the bootstrap replicates.
+#'
+#' @param reliabilities Optional named numeric vector of user-supplied reliabilities
+#'   used for the PLSc consistency correction. Values are interpreted as construct
+#'   reliabilities (i.e., squared construct quality, \eqn{Q^2}) for the named
+#'   constructs. These override the internally computed construct qualities.
+#'
+#' @param ... Internal arguments. For advanced users only.
+#'
+#' @return An object of class \code{plssem} containing the estimated parameters, fit
 #'   measures, factor scores, and any bootstrap results. Methods such as
-#'   `summary()`, `print()`, and `coef()` can be applied to inspect the fit.
+#'   \code{summary()}, \code{print()}, and \code{coef()} can be applied to inspect the fit.
 #'
 #' @seealso [summary.plssem()], [print.plssem()]
 #'
@@ -183,12 +228,18 @@ pls <- function(syntax,
                 standardize = TRUE,
                 consistent = TRUE,
                 bootstrap = FALSE,
-                sample = 50L,
                 ordered = NULL,
+                missing = c("listwise", "mean", "kNN"),
+                knn.k = 5,
                 mcpls = NULL,
                 probit = NULL,
                 tolerance = 1e-5,
                 max.iter.0_5 = 100L,
+                boot.ncpus = 1L,
+                boot.parallel = c("no", "multicore", "snow"),
+                boot.R = 50L,
+                boot.iseed = NULL,
+                sample = NULL,
                 mc.min.iter = 5L,
                 mc.max.iter = 250L,
                 mc.reps = 20000L,
@@ -197,15 +248,38 @@ pls <- function(syntax,
                 mc.polyak.juditsky = FALSE,
                 mc.fn.args = list(),
                 verbose = interactive(),
+                boot.optimize = TRUE,
+                mc.boot.control = list(
+                  min.iter        = mc.min.iter,
+                  max.iter        = mc.max.iter,
+                  mc.reps         = floor(0.5 * mc.reps),
+                  tol             = 2 * mc.tol,
+                  polyak.juditsky = FALSE,
+                  verbose         = FALSE,
+                  fixed.seed      = TRUE,
+                  reuse.p.start   = TRUE
+                ),
+                reliabilities = NULL,
                 ...) {
+
+  missing <- match.arg(tolower(missing), c("listwise", "mean", "knn"))
+  boot.parallel <- match.arg(boot.parallel)
+
+  if (!is.null(sample)) {
+    warning("The sample argument is deprecated, please use the boot.R argument instead!")
+    boot.R <- sample
+  }
+
   # preprocess data
   data <- as.data.frame(data)
 
   # Define model
+  # If there is no higher order model we only have the path
   model <- specifyModel(
     syntax             = syntax,
     data               = data,
     consistent         = consistent,
+    missing            = missing,
     standardize        = standardize,
     ordered            = ordered,
     probit             = probit,
@@ -219,16 +293,27 @@ pls <- function(syntax,
     mc.fixed.seed      = mc.fixed.seed,
     mc.polyak.juditsky = mc.polyak.juditsky,
     mc.fn.args         = mc.fn.args,
-    verbose            = verbose
+    verbose            = verbose,
+    bootstrap          = bootstrap,
+    boot.ncpus         = boot.ncpus,
+    boot.parallel      = boot.parallel,
+    boot.R             = boot.R,
+    boot.iseed         = boot.iseed,
+    boot.optimize      = boot.optimize,
+    mc.boot.control    = mc.boot.control,
+    knn.k              = knn.k,
+    reliabilities      = reliabilities,
+    ...
   )
 
   # Fit model
   model <- estimatePLS(model = model)
 
   # Bootstrap
-  if (bootstrap) {
-    model$boot <- bootstrap(model, R = sample)
+  if (model$info$boot$bootstrap) {
+    model$boot <- bootstrap(model)
     model$params$se <- model$boot$se
+    model$params$vcov <- model$boot$vcov
   }
 
   model$parTable <- getParTableEstimates(model)
@@ -237,7 +322,7 @@ pls <- function(syntax,
 }
 
 
-resetPLS_Model <- function(model, hard.reset = FALSE) {
+resetPLS_SubModel <- function(model, hard.reset = FALSE) {
   model$status$finished       <- FALSE
   model$status$convergence    <- FALSE
   model$status$iterations.0_5 <- 0L
@@ -252,14 +337,55 @@ resetPLS_Model <- function(model, hard.reset = FALSE) {
 }
 
 
-estimatePLS_Inner <- function(model) {
-  model <- resetPLS_Model(model, hard.reset = TRUE)
+estimatePLS_SubModelInner <- function(submodel) {
+  submodel <- resetPLS_SubModel(submodel, hard.reset = TRUE)
 
-  resetPLS_Model(model) |>
+  resetPLS_SubModel(submodel) |>
     estimatePLS_Step0_5() |>
     estimatePLS_Step6() |>
     estimatePLS_Step7() |>
     estimatePLS_Step8()
+}
+
+
+estimatePLS_Inner <- function(model) {
+  submodels   <- model$submodels
+  firstOrder  <- submodels$firstOrder
+  secondOrder <- submodels$secondOrder
+
+  firstOrder <- estimatePLS_SubModelInner(firstOrder)
+
+  if (!is.null(secondOrder)) {
+    scores <- getFactorScores(firstOrder)
+    
+    want <- colnames(secondOrder$data)
+    have <- colnames(scores)
+
+    have[!have %in% want] <- paste0(TEMP_OV_PREFIX, have[!have %in% want])
+    colnames(scores) <- have
+
+    stopif(!all(have %in% want), "Missing construct scores for: ",
+           paste0(setdiff(want, have), collapse = ", "))
+
+    newdata <- scores[,want] # Copy possible cluster attribute
+    attr(newdata, "cluster") <- attr(firstOrder$data, "cluster")
+
+    secondOrder$data <- newdata
+    secondOrder$matrices$S <- Rfast::cova(newdata)
+    secondOrder$info$reliabilities <- firstOrder$fit$Q^2
+
+    secondOrder <- estimatePLS_SubModelInner(secondOrder)
+    secondOrder <- correctLoadingsAndWeightsSecondOrder(
+      firstOrder = firstOrder, secondOrder = secondOrder
+    )
+  }
+
+  model$submodels <- list(
+    firstOrder  = firstOrder,
+    secondOrder = secondOrder
+  )
+
+  combineModelResultsFirstSecondOrder(model)
 }
 
 

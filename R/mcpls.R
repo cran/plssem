@@ -1,5 +1,6 @@
 mcpls <- function(
   fit0,
+  p.start         = fit0$info$mc.args$p.start,
   min.iter        = fit0$info$mc.args$min.iter,
   max.iter        = fit0$info$mc.args$max.iter,
   mc.reps         = fit0$info$mc.args$mc.reps,
@@ -12,19 +13,16 @@ mcpls <- function(
   ...
 ) {
 
-  data <- fit0$data
+  fit0.base <- fit0
+  data <- fit0.base$data
   vars <- colnames(data)
   ordered <- fit0$info$ordered
+  is.hi.ord <- fit0$info$is.high.ord
 
-  PROBS <- stats::setNames(vector("list", length(ordered)), nm = ordered)
-  for (ord in ordered) {
-    freq <- table(data[,ord])
-    pct  <- cumsum(freq) / sum(freq)
-    PROBS[[ord]] <- pct[-length(pct)]
-  }
+  PROBS <- getPROBS(data = data, ordered = ordered)
 
   par0 <- getFreeParamsTable(fit0)
-  par1 <- par0[c("lhs", "op", "rhs", "est")]
+  par1 <- par0[c("lhs", "op", "rhs", "est", "is.free")]
 
   if (fixed.seed && is.null(rng.seed)) {
     rng.seed <- floor(stats::runif(1L, min = 0, max = 9999999))
@@ -32,22 +30,27 @@ mcpls <- function(
   }
 
   .f <- function(p) {
-    par1$est <- p
+    par1[par1$is.free, "est"] <- p
 
-    sim <- simulateDataParTable(par1, N = mc.reps, seed = rng.seed)
+    sim <- simulateDataParTable(par1, N = mc.reps, seed = rng.seed, check.hi.ord = is.hi.ord)
     sim.ov <- ordinalizeDataFrame(sim$ov, PROBS = PROBS, ordered = ordered)
 
-    fit0$data <- Rfast::standardise(as.matrix(sim.ov[vars]))
-    fit0$matrices$S <- Rfast::cova(fit0$data)
+    fit.sim <- fit0.base
+    X <- Rfast::standardise(as.matrix(sim.ov[vars]))
+    S <- Rfast::cova(X)
 
-    fit2 <- estimatePLS_Inner(fit0)
+    fit.sim$submodels$firstOrder$data <- X
+    fit.sim$submodels$firstOrder$matrices$S <- S
+
+    fit2 <- estimatePLS_Inner(fit.sim)
     par2 <- getFreeParamsTable(fit2)
 
-    par2$est - par0$est
+    eps <- par2$est - par0$est + sim$penalty
+    eps[par0$is.free]
   }
 
-  p <- par1$est
-
+  ok.start <- !is.null(p.start) && length(p.start) == sum(par1$is.free)
+  p <- if (ok.start) p.start else par1[par1$is.free, "est"]
 
   mcfit <- robbinsMonro1951(
     p               = p,
@@ -82,15 +85,18 @@ mcpls <- function(
     iter <- iter + mcfit$iter
   }
 
-  par1$est <- as.vector(mcfit$root)
+  par1[par1$is.free, "est"] <- as.vector(mcfit$root)
   fit1 <- updateModelFromFreeParTableMC(
     parTable = par1,
-    model    = fit0,
+    model    = fit0.base,
     mc.reps  = mc.reps,
+    PROBS    = PROBS,
+    ordered  = ordered, 
     seed     = rng.seed
   )
 
   fit1$status$iterations <- mcfit$iter
+  fit1$info$mc.args$p.start <- as.vector(mcfit$root)
 
   fit1
 }
@@ -114,7 +120,7 @@ ordinalizeDataFrame <- function(df, PROBS, ordered = NULL) {
 
 
 getFreeParamsTable <- function(model) {
-  parTable <- getParTableEstimates(model)
+  parTable <- getParTableEstimates(model, rm.tmp = FALSE)
 
   lhs <- parTable$lhs
   op  <- parTable$op
@@ -122,24 +128,36 @@ getFreeParamsTable <- function(model) {
 
   cond1 <- !(lhs == rhs & op == "~~")
   cond2 <- !((grepl(":", lhs) | grepl(":", rhs)) & op == "~~")
+  cond3 <- op != "~1" & !grepl("~", lhs) & !grepl("~", rhs)
 
-  out <- parTable[cond1 & cond2, , drop = FALSE]
-  attr(out, "cond") <- cond1 & cond2
+  out <- parTable[cond1 & cond2 & cond3, , drop = FALSE]
+  attr(out, "cond") <- cond1 & cond2 & cond3
+
+  out$is.free <- out$op != "<~" # Can be made more comprehensive later
 
   out
 }
 
 
-updateModelFromFreeParTableMC <- function(parTable, model, mc.reps, seed = NULL) {
-  sim <- simulateDataParTable(parTable, N = mc.reps, seed = seed)
+updateModelFromFreeParTableMC <- function(parTable, model, mc.reps,
+                                          PROBS, ordered, seed = NULL) {
+  sim <- simulateDataParTable(parTable, N = mc.reps, seed = seed,
+                              check.hi.ord = model$info$is.high.ord)
+  sim.ord <- ordinalizeDataFrame(sim$ov, PROBS = PROBS, ordered = ordered)
 
   lvs <- getLVs(parTable)
   indsLVs <- getIndsLVs(parTable, lVs = lvs)
 
-  SC <- Rfast::cova(as.matrix(sim$all))
+  SC <- cov2cor(Rfast::cova(as.matrix(sim$all)))
 
   ovs <- colnames(model$matrices$S)
   lvs <- colnames(model$matrices$C)
+
+  model$matrices$S.ord.expected <- cov2cor(Rfast::cova(as.matrix(sim.ord)[,ovs]))
+  model$matrices$S.ord.observed <- cov2cor(Rfast::cova(model$data[,ovs]))
+
+  model$matrices$sim.ov.cont <- sim$ov
+  model$matrices$sim.ov.ord  <- sim.ord
 
   model$matrices$S  <- SC[ovs, ovs, drop = FALSE]
   model$matrices$C  <- SC[lvs, lvs, drop = FALSE]
@@ -151,7 +169,7 @@ updateModelFromFreeParTableMC <- function(parTable, model, mc.reps, seed = NULL)
   fitCov         <- fit$fitCov
   fitTheta       <- fit$fitTheta
 
-  select <- model$matrices$select
+  select       <- model$matrices$select
   selectLambda <- select$lambda
   selectGamma  <- select$gamma
   selectCov    <- select$cov
@@ -210,33 +228,42 @@ updateModelFromFreeParTableMC <- function(parTable, model, mc.reps, seed = NULL)
     fitCov[i, j] <- fitCov[j, i] <- par
   }
 
-  model$fit$fitMeasurement <- fitMeasurement
-  model$fit$fitStructural  <- fitStructural
-  model$fit$fitCov         <- fitCov
-  model$fit$fitTheta       <- fitTheta
+  model$fit$fitMeasurement   <- fitMeasurement
+  model$fit$fitStructural    <- fitStructural
+  model$fit$fitCov           <- fitCov
+  model$fit$fitTheta         <- fitTheta
   model$status$is.admissible <- sim$is.admissible
 
-  estimatePLS_Step8(model)
+  model$status$mcpls.update.args <- list(
+    parTable = parTable,
+    model    = model,
+    mc.reps  = mc.reps,
+    PROBS    = PROBS,
+    ordered  = ordered,
+    seed     = seed
+  )
+
+  estimatePLS_Step8(model, update.names = TRUE)
 }
 
 
-robbinsMonro1951 <- function(p, f, tol, min.iter, max.iter, verbose,
-                             polyak.juditsky, fn.args, ...) {
+resampleMCPLS_Fit <- function(model, ...) {
+  args <- model$status$mcpls.update.args
+  new.args <- list(...)
+  args[names(new.args)] <- new.args
 
-  args.required <- list(
-      p               = p,
-      f               = f,
-      tol             = tol,
-      miniter         = min.iter,
-      maxiter         = max.iter,
-      verbose         = verbose,
-      Polyak_Juditsky = polyak.juditsky
-  )
+  do.call(updateModelFromFreeParTableMC, args)
+}
 
-  args <- c(args.required, fn.args, list(...))
 
-  mcfit <- do.call(SimDesign::RobbinsMonro, args)
-  if (verbose) cat("\n")
+getPROBS <- function(data, ordered) {
+  PROBS <- stats::setNames(vector("list", length(ordered)), nm = ordered)
 
-  mcfit
+  for (ord in ordered) {
+    freq <- table(data[,ord])
+    pct  <- cumsum(freq) / sum(freq)
+    PROBS[[ord]] <- pct[-length(pct)]
+  }
+
+  PROBS
 }

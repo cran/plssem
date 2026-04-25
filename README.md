@@ -1,20 +1,26 @@
-# `plssem`
+# `plssem` <img src="man/figures/plssem.png" alt="Logo" align = "right" height="139" class="logo">
 
 The goal of the [`plssem`](https://kss2k.github.io/plssem/) package is to allow the
 estimation of complex Structural Equation Models (SEMs) using the
 PLS-SEM framework. This package expands the PLS-SEM (and PLSc-SEM) framework
 to handle categorical data, non-linear models, and multilevel structures.
 
-[`plssem`](https://kss2k.github.io/plssem/) is currently under development. The end goal is to allow the estimation
+[`plssem`](https://kss2k.github.io/plssem/) is currently under development. The end goal is to allow the consistent estimation
 of non-linear multilevel PLS-SEM (and PLSc-SEM) models with ordinal/categorical data.
 
 ## Installation
-The package currently needs to be installed from `GitHub`. Currently, it
-also depends on the latest development version of `modsem`.
+
+The package can be downloaded from `CRAN`.
 
 ```r
-devtools::install_github("kss2k/modsem")
-devtools::install_github("kss2k/plssem")
+install.packages("plssem")
+```
+
+The development version of the package can be installed from `GitHub`. It
+should be paired with the latest development version of `modsem`.
+
+```r
+devtools::install_github(c("kss2k/modsem", "kss2k/plssem"))
 ```
 
 ## Examples
@@ -139,5 +145,17 @@ fit <- pls(m, oneIntOrdered, bootstrap = TRUE)
 summary(fit)
 ```
 
-## TODO
-1. Fix mismatching thresholds in bootstrapping (`R/bootstrap.R`, line 30)
+### Multilevel Random Slopes Interaction Model with Continuous Data
+```r
+syntax <- "
+  X =~ x1 + x2 + x3
+  Z =~ z1 + z2 + z3
+  Y =~ y1 + y2 + y3
+  W =~ w1 + w2 + w3
+  Y ~ X + Z + X:Z + (1 + X + Z + X:Z | cluster)
+  W ~ X + Z + X:Z + (1 + X + Z + X:Z | cluster)
+"
+
+fit <- pls(m, randomSlopes, bootstrap = TRUE)
+summary(fit)
+```

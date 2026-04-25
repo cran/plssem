@@ -1,64 +1,5 @@
-getPLS_Data <- function(data,
-                        indicators,
-                        cluster = NULL,
-                        consistent = TRUE,
-                        standardize = TRUE,
-                        ordered = NULL,
-                        is.probit = NULL,
-                        is.cexp = NULL) {
-  vars <- c(indicators, cluster)
-  missing <- !vars %in% colnames(data)
-
-  if (any(missing))
-    stop("Missing variables: ", paste0(vars[missing], collapse = ", "))
-
-  data <- as.data.frame(data)[vars]
-
-  missingCases <- !stats::complete.cases(data)
-  if (any(missingCases)) {
-    warning("Removing missing data list wise for factor scores.\n",
-            "Removing missing data pair wise in covariance matrix.\n",
-            "TODO: Add multiple imputation")
-  }
- 
-  if (standardize) {
-    data <- standardizeDataFrame(
-      data    = data,
-      cluster = cluster
-    )
-  }
-
-  S <- getCorrMat(data[indicators], probit = is.probit, ordered = ordered)
-  X <- as.matrix(data[indicators])
-
-  if (!is.null(cluster)) {
-    if (!is.character(cluster))
-      stop("`cluster` must be a character string, if lme4.syntax is provided!")
-
-    attr(X, "cluster") <- data[, cluster, drop = FALSE]
-  }
-
-  list(X = X, S = S)
-}
-
-
 getNonZeroElems <- function(x) {
   as.vector(x[!is.na(x) & x != 0])
-}
-
-
-standardizeDataFrame <- function(data, cluster = NULL, subset = colnames(data)) {
-  subset <- setdiff(subset, cluster)
-
-  Z <- lapply(data[subset], FUN = standardizeAtomic)
-  data[subset] <- Z
-
-  data
-}
-
-
-standardizeAtomic <- function(x) {
-  (x - mean(x)) / stats::sd(x)
 }
 
 
@@ -110,48 +51,23 @@ printf <- function(...) {
 }
 
 
-cov2cor <- function(vcov) {
-  if (is.null(vcov))
-    return(NULL)
-
-  sd <- sqrt(abs(diag(vcov))) # use `abs()`, in case some variances are negative
-
-  if (length(sd) == 1L) D <- matrix(1 / sd, nrow = 1L, ncol = 1L)
-  else                  D <- diag(1 / sd)
-
-  structure(D %*% vcov %*% D, dimnames = dimnames(vcov))
-}
-
-
 warning2 <- function(...) {
   warning(..., call. = FALSE)
 }
 
 
+stop2 <- function(...) {
+  stop(..., call. = FALSE)
+}
+
+
 stopif <- function(cond, ...) {
-  if (isTRUE(cond)) stop(..., call. = FALSE)
+  if (isTRUE(cond)) stop2(...)
 }
 
 
 warnif <- function(cond, ...) {
-  if (isTRUE(cond)) warning2(..., call. = FALSE)
-}
-
-
-getCorrMat <- function(data, probit = FALSE, ordered = NULL) {
-  if (probit) getPolyCorr(data, ordered = ordered)
-  else        getPearsonCorr(data)
-}
-
-
-getPearsonCorr <- function(data) {
-  stats::cor(as.data.frame(data), use = "pairwise.complete.obs")
-}
-
-
-getPolyCorr <- function(data, ordered = NULL) {
-  data <- as.data.frame(data)
-  lavaan::lavCor(data, ordered = ordered)
+  if (isTRUE(cond)) warning2(...)
 }
 
 
@@ -172,7 +88,9 @@ formatNumeric <- function(x, digits = 3, scientific = FALSE,
 
 
 getIntTerms <- function(parTable) {
-  unique(parTable[grepl(":", parTable$rhs), "rhs"])
+  cond1 <- grepl(":", parTable$rhs)
+  cond2 <- !grepl("\\(|\\)\\|", parTable$rhs)
+  unique(parTable[cond1 & cond2, "rhs"])
 }
 
 
@@ -236,8 +154,22 @@ getStructVars <- function(parTable) {
 }
 
 
+getCovOnlyVars <- function(parTable) {
+  covRows <- parTable[parTable$op == "~~", , drop = FALSE]
+  if (!NROW(covRows)) return(NULL)
+
+  covVars <- unique(c(covRows$lhs, covRows$rhs))
+  inds    <- getIndicators(parTable)
+
+  setdiff(covVars, inds)
+}
+
+
 getStructOVs <- function(parTable) {
-  intersect(getStructVars(parTable), getOVs(parTable))
+  struct <- getStructVars(parTable)
+  cov    <- getCovOnlyVars(parTable)
+
+  intersect(union(struct, cov), getOVs(parTable))
 }
 
 
@@ -333,4 +265,53 @@ getIndsLVs <- function(parTable, lVs, isOV = FALSE, ovs = NULL) {
 
 lapplyNamed <- function(X, FUN, ..., names = X) {
   structure(lapply(X, FUN, ...), names = names)
+}
+
+
+tr <- function(X) {
+  sum(diag(X))
+}
+
+
+uniqueComplete <- function(x) {
+  unique(x[!is.na(x)])
+}
+
+
+getHigherOrderLVs <- function(parTable) {
+  lVs                  <- getLVs(parTable)
+  isHigherOrder        <- logical(length(lVs))
+  names(isHigherOrder) <- lVs
+
+  for (lV in lVs) {
+    inds <- parTable[parTable$lhs == lV & parTable$op %in% c("<~", "=~"), "rhs"] |>
+      stringr::str_split(pattern = ":") |> unlist()
+
+    if (any(inds %in% lVs)) isHigherOrder[[lV]] <- TRUE
+  }
+
+  if (!any(isHigherOrder)) NULL else lVs[isHigherOrder]
+}
+
+
+getParTableFromParNames <- function(parnames) {
+  OP <- "~~|=~|~1|~|<~"
+  op <- stringr::str_extract(parnames, pattern = OP)
+  lr <- stringr::str_split_fixed(parnames, pattern = OP, n = 2)
+
+  lhs <- lr[, 1]
+  rhs <- lr[, 2]
+  op[is.na(op)] <- "~"
+
+  list(lhs = lhs, op = op, rhs = rhs)
+}
+
+
+namedListUnion <- function(x, y) {
+  if      (is.null(y)) return(x)
+  else if (is.null(x)) return(y)
+
+  new <- setdiff(names(y), names(x))
+  x[new] <- y[new]
+  x
 }
