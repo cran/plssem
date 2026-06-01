@@ -14,8 +14,8 @@ getPLS_Data <- function(data,
   vars <- c(indicators, cluster)
   varIsMissing <- !vars %in% colnames(data)
 
-  stopif(any(varIsMissing),
-        "Missing variables: ", paste0(vars[varIsMissing], collapse = ", "))
+  pls_stopif(any(varIsMissing),
+             "Missing variables: ", paste0(vars[varIsMissing], collapse = ", "))
 
   data <- as.data.frame(data)[vars]
 
@@ -23,7 +23,7 @@ getPLS_Data <- function(data,
     clusterMissing <- !stats::complete.cases(data[, cluster, drop = FALSE])
 
     if (any(clusterMissing)) {
-      message("Removing rows with missing `cluster`...")
+      pls_msg_note("Removing rows with missing `cluster`...")
       data <- data[!clusterMissing, , drop = FALSE]
     }
   }
@@ -33,16 +33,16 @@ getPLS_Data <- function(data,
 
   if (anyMissing) {
     isMissingAll <- apply(data, MARGIN = 2L, FUN = \(x) all(is.na(x)))
-    stopif(any(isMissingAll), "Some variables have all missing values!\n",
-           "Variables: ", paste0(colnames(data)[isMissingAll], collapse = ", "))
+    pls_stopif(any(isMissingAll), paste0("Some variables have all missing values!\n",
+               "Variables: ", paste0(colnames(data)[isMissingAll], collapse = ", ")))
   }
 
   if (anyMissing && missing == "listwise") {
-    message("Removing missing data using listwise deletion...")
+    pls_msg_note("Removing missing data using listwise deletion...")
     data <- data[!missingCases, , drop = FALSE]
 
   } else if (anyMissing && missing == "knn") {
-    message("Imputing missing data using k-Nearest Neighbors (kNN), k = ", knn.k, "...")
+    pls_msg_note(paste0("Imputing missing data using k-Nearest Neighbors (kNN), k = ", knn.k, "..."))
 
     # Remove rows where all indicators are missing
     allMissing <- as.logical(matrixStats::rowProds(
@@ -58,16 +58,23 @@ getPLS_Data <- function(data,
     )
 
   } else if (anyMissing && missing == "mean") {
-    message("Imputing missing data using mean imputation...")
+    pls_msg_note("Imputing missing data using mean imputation...")
 
     data[indicators] <- meanImputeMissing(data[indicators], ordered = ordered)
   }
- 
+
   if (standardize) {
     data <- standardizeDataFrame(
       data    = data,
       cluster = cluster
     )
+
+  } else {
+    pls_msg_warn(paste0(
+      "The `pls()` function usually assumes that the data is standardized!\n",
+      "Setting `standardized=FALSE` may have unexpected side effects!"
+    ))
+
   }
 
   S <- getCorrMat(data[indicators], probit = is.probit, ordered = ordered)
@@ -75,7 +82,7 @@ getPLS_Data <- function(data,
 
   if (!is.null(cluster)) {
     if (!is.character(cluster))
-      stop("`cluster` must be a character string, if lme4.syntax is provided!")
+      pls_msg_stop("`cluster` must be a character string, if lme4.syntax is provided!")
 
     attr(X, "cluster") <- data[, cluster, drop = FALSE]
   }
@@ -86,9 +93,9 @@ getPLS_Data <- function(data,
 
 checkAndFixDTypesPLS_Data <- function(X, check = colnames(X)) {
   if (!is.data.frame(X)) X <- as.data.frame(X)
-  
+
   varIsMissing <- !check %in% colnames(X)
-  stopif(any(varIsMissing),
+  pls_stopif(any(varIsMissing),
     "Missing variables: ", paste0(check[varIsMissing], collapse = ", ")
   )
 
@@ -105,10 +112,10 @@ checkAndFixDTypesPLS_Data <- function(X, check = colnames(X)) {
     factors <- check[isNominal]
   }
 
-  stopif(any(isNominal),
-   "Please recode nominal categorical (e.g., 'factor' and 'character')\n",
-   "into dummy variables, and specify the dummy variables as ordered,\n",
-   "using the `ordered` argument!"
+  pls_stopif(any(isNominal),
+    "Please recode nominal categorical (e.g., 'factor' and 'character')\n",
+    "into dummy variables, and specify the dummy variables as ordered,\n",
+    "using the `ordered` argument!"
   )
 
   X

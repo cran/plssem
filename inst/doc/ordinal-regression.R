@@ -19,7 +19,7 @@ fit_linear <- pls(
   boot.R        = 50,
   bootstrap     = TRUE,
   boot.parallel = "multicore",
-  boot.ncpus    = 2
+  boot.ncores   = 2
 )
 
 summary(fit_linear)
@@ -37,7 +37,7 @@ fit_int <- pls(
   boot.R        = 50,
   bootstrap     = TRUE,
   boot.parallel = "multicore",
-  boot.ncpus    = 2
+  boot.ncores   = 2
 )
 
 summary(fit_int)

@@ -24,13 +24,13 @@ kNN_ImputeMissing <- function(data, k = 5, ordered = NULL) {
   }
 
   if (length(ordered) && k %% 2 == 0) {
-    warning2("k should be odd when imputing ordered variables!\n",
-             "Using k=", k + 1, " instead of k=", k, "!")
+    pls_msg_warn(paste0("k should be odd when imputing ordered variables!\n",
+                 "Using k=", k + 1, " instead of k=", k, "!"))
     k <- k + 1
   }
 
-  stopif(NROW(Y) < k, "kNN imputation expects that there exists at least k\n",
-         "(k=", k, ") complete observations, ", NROW(Y), " were found!")
+  pls_stopif(NROW(Y) < k, paste0("kNN imputation expects that there exists at least k\n",
+             "(k=", k, ") complete observations, ", NROW(Y), " were found!"))
 
 
   cols <- colnames(X)
@@ -39,7 +39,7 @@ kNN_ImputeMissing <- function(data, k = 5, ordered = NULL) {
     p.i    <- patterns[i, ]
 
     if (!any(p.i)) {
-      warning2("Unable to impute values for rows with all missing values.")
+      pls_msg_warn("Unable to impute values for rows with all missing values.")
       next
     }
 
@@ -54,7 +54,7 @@ kNN_ImputeMissing <- function(data, k = 5, ordered = NULL) {
     neighbours <- FNN::knnx.index(data = Y.std.i, query = Z.std.i, k = k)
 
     for (variable in cols[!p.i]) {
-      if      (variable %in% nominal) .f <- calcMode 
+      if      (variable %in% nominal) .f <- calcMode
       else if (variable %in% ordered) .f <- stats::median
       else                            .f <- mean
 
@@ -70,7 +70,7 @@ kNN_ImputeMissing <- function(data, k = 5, ordered = NULL) {
   }
 
   X[!complete, ] <- Z
- 
+
   as.data.frame(X)
 }
 

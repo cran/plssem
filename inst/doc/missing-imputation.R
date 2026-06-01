@@ -39,7 +39,7 @@ library(plssem)
 #                bootstrap = TRUE,
 #                boot.R = 100,
 #                boot.parallel = "multicore", # Use parallel bootstrap
-#                boot.ncpus = 2L)
+#                boot.ncores = 2L)
 # 
 #   COEF <- rbind(COEF, coef(fit.i))
 #   BOOT <- rbind(BOOT, boot(fit.i))

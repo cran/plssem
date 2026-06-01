@@ -15,6 +15,12 @@ testthat::expect_no_error({
   summary(fit.c)
 })
 
+testthat::expect_no_error({
+  fit.mc <- pls(syntax, data = randomSlopes,
+                consistent = FALSE, mcpls = TRUE)
+  summary(fit.mc)
+})
+
 syntax <- "
   X =~ x1 + x2 + x3
   Z =~ z1 + z2 + z3
@@ -26,7 +32,7 @@ syntax <- "
 
 testthat::expect_no_error({
   fit.o <- pls(syntax, data = randomSlopesOrdered,
-             consistent = TRUE, bootstrap = TRUE)
+             consistent = TRUE, bootstrap = TRUE, mcpls = TRUE)
   summary(fit.o)
 })
 

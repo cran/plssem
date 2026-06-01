@@ -7,7 +7,7 @@ knitr::opts_chunk$set(
 library(plssem)
 
 ## ----tpb-ordered, message=FALSE, warning=FALSE--------------------------------
-tpb <- ' 
+tpb <- '
 # Outer Model (Based on Hagger et al., 2007)
   ATT =~ att1 + att2 + att3 + att4 + att5
   SN =~ sn1 + sn2
@@ -17,7 +17,7 @@ tpb <- '
 
 # Inner Model (Based on Steinmetz et al., 2011)
   INT ~ ATT + SN + PBC
-  BEH ~ INT + PBC 
+  BEH ~ INT + PBC
 '
 
 fit_cat <- pls(

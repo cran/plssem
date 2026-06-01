@@ -1,9 +1,9 @@
 Package: plssem
 Type: Package
 Title: Complex Partial Least Squares Structural Equation Modeling
-Version: 0.1.1
+Version: 0.1.2
 Authors@R: 
-    person(given = "Kjell", family = "Solem Slupphaug", 
+    person(given = "Kjell", family = "Solem Slupphaug",
            email = "slupphaugkjell@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "0009-0005-8324-2834"))
 Maintainer: Kjell Solem Slupphaug <slupphaugkjell@gmail.com>
@@ -18,7 +18,7 @@ Description:
     for ordinal PLS-SEM and PLSc-SEM. Additional extensions are under development.
     The MC-OrdPLSc algorithm, used to handle ordinal interaction models is detailed
     in Slupphaug et al., (2026).
-    References: 
+    References:
     Lohmöller, J.-B. (1989, ISBN:9783790803002).
       "Latent Variable Path Modeling with Partial Least Squares."
     Dijkstra, T. K., & Henseler, J. (2015).
@@ -36,17 +36,17 @@ Description:
 License: GPL-3
 Encoding: UTF-8
 LazyData: true
-RoxygenNote: 7.3.3
-Imports: stats, modsem (>= 1.0.17), lme4, lavaan, stringr, purrr,
-        matrixStats, Rfast, collapse, mvnfast, reformulas, parallel,
-        FNN
+Imports: methods, stats, modsem (>= 1.0.20), lme4, lavaan, stringr,
+        purrr, matrixStats, Rfast, collapse, mvnfast, reformulas,
+        future, future.apply, progressr, FNN, MASS
 Depends: R (>= 4.1.0)
 URL: https://github.com/kss2k/plssem, https://kss2k.github.io/plssem/
-Suggests: knitr, rmarkdown, mice, mvtnorm
+Suggests: knitr, rmarkdown, ggplot2, mice, mvtnorm, pkgload
 VignetteBuilder: knitr
-NeedsCompilation: no
-Packaged: 2026-04-25 15:42:23 UTC; kss
+Config/roxygen2/version: 8.0.0
+NeedsCompilation: yes
+Packaged: 2026-06-01 17:38:16 UTC; kss
 Author: Kjell Solem Slupphaug [aut, cre] (ORCID:
     <https://orcid.org/0009-0005-8324-2834>)
 Repository: CRAN
-Date/Publication: 2026-04-25 16:50:02 UTC
+Date/Publication: 2026-06-01 19:20:02 UTC

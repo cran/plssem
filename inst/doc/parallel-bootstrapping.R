@@ -16,17 +16,17 @@ m <- '
 '
 
 ## ----boot-windows, eval = FALSE-----------------------------------------------
-# fit_win <- pls(
+# fit_ms <- pls(
 #   m,
 #   data          = oneIntOrdered,
 #   ordered       = colnames(oneIntOrdered),
 #   bootstrap     = TRUE,
 #   boot.R        = 500,
-#   boot.ncpus    = 2,
-#   boot.parallel = "snow",
+#   boot.ncores   = 2,
+#   boot.parallel = "multisession",
 #   boot.iseed    = 123
 # )
-# summary(fit_win)
+# summary(fit_ms)
 
 ## ----boot-linux, eval = FALSE-------------------------------------------------
 # fit_linux <- pls(
@@ -35,7 +35,7 @@ m <- '
 #   ordered       = colnames(oneIntOrdered),
 #   bootstrap     = TRUE,
 #   boot.R        = 500,
-#   boot.ncpus    = 2,
+#   boot.ncores   = 2,
 #   boot.parallel = "multicore",
 #   boot.iseed    = 123
 # )

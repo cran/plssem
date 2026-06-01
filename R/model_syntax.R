@@ -1,21 +1,62 @@
 TEMP_OV_PREFIX <- ".TEMP_OV__"
+TEMP_IND_SUFFIX <- "__TEMP_IND_"
 
+TEMP_OV_PREFIX_PATTERN <- paste0("^", TEMP_OV_PREFIX)
+TEMP_IND_SUFFIX_PATTERN <- paste0(TEMP_IND_SUFFIX, "([0-9]+)$")
 
 parseModelArguments <- function(parTable,
                                 data,
                                 ordered = NULL,
                                 probit = NULL,
                                 mcpls = FALSE,
+                                mc.fast.lmer = NULL,
                                 consistent = TRUE,
                                 is.lower.order = FALSE) {
   data <- as.data.frame(data)
 
+  # Check for interation terms
   intTermNames <- getIntTerms(parTable)
   intTermElems <- stringr::str_split(intTermNames, pattern = ":")
   names(intTermElems)  <- intTermNames
   is.nlin <- length(intTermElems) > 0L
 
-  # Int Terms
+  # Check for dupliacted indicators
+  isind <- parTable$op %in% MOPS
+  isstr <- parTable$op == "~"
+  iscov <- parTable$op == "~~"
+
+  indicators <- parTable[isind, "rhs"]
+  covvars    <- unique(c(parTable[iscov, "lhs"], parTable[iscov, "rhs"]))
+  structvars <- unique(c(parTable[isstr, "rhs"], covvars))
+
+  # A duplicated indicator can occur under two circumstances:
+  #   1. It's an indicator which is part of two constructs
+  #   2. It's an indicator which is used both as a structural variable
+  #      and as an indicator. This is quite likely in higher order models.
+  #      In these cases we rename the indicators, to avoid
+  #      name clashes.
+  dupMsr <- unique(indicators[duplicated(indicators)])     # Case 1
+  dupStr <- unique(indicators[indicators %in% structvars]) # Case 2
+  dupAll <- unique(c(dupMsr, dupStr))
+
+  for (ind in dupAll) {
+
+    cond <- isind & parTable$rhs == ind
+    k    <- sum(cond)
+
+    newnames <- paste0(
+      parTable[cond, "rhs"], TEMP_IND_SUFFIX, seq_len(k)
+    )
+    parTable[cond, "rhs"] <- newnames
+
+    if (!is.null(ordered) && ind %in% ordered)
+      ordered <- union(ordered, newnames)
+
+    for (newname in newnames)
+      data[[newname]] <- data[[ind]]
+
+  }
+
   # Check for observed (structural) variables
   structovs <- getStructOVs(parTable)
   ovs       <- getOVs(parTable)
@@ -33,8 +74,8 @@ parseModelArguments <- function(parTable,
     data[[ord]] <- as.integer(as.ordered(data[[ord]]))
 
   missing <- setdiff(ovs, colnames(data))
-  stopif(length(missing), "Missing observed variables in data:\n  ",
-         paste(missing, collapse = ", "))
+  pls_stopif(length(missing), paste0("Missing observed variables in data:\n  ",
+             paste(missing, collapse = ", ")))
 
   for (ov in structovs) {
     tmp.ov <- paste0(TEMP_OV_PREFIX, ov)
@@ -43,14 +84,22 @@ parseModelArguments <- function(parTable,
       ordered[ordered==ov] <- tmp.ov
 
     data[[tmp.ov]] <- data[[ov]]
+
+    # Replace (potentially) existing measurement expressions
+    # parTable[parTable$op %in% MOPS &
+    #          parTable$rhs == ov, "rhs"] <- tmp.ov
+
+    # Add measurment equation
     parTable <- rbind(
       parTable,
       data.frame(lhs = ov, op = "<~", rhs = tmp.ov, mod = "")
     )
   }
 
+  # Recompile syntax
   syntax <- parTableToSyntax(parTable)
 
+  # Check for multilevel/mixed effects
   isMultilevel <- grepl("\\(.*\\|.*\\)", parTable$rhs) & parTable$op %in% c("~", "~~")
   if (any(isMultilevel)) {
     multilevelEtas <- unique(parTable[isMultilevel & parTable$op == "~", "lhs"])
@@ -74,10 +123,13 @@ parseModelArguments <- function(parTable,
     lme4.syntax <- NULL
   }
 
-  has.ord <- length(ordered) > 0L
-  is.mcpls  <- if (is.null(mcpls)) has.ord && (is.nlin || is.lower.order) else mcpls
-  is.probit <- if (is.null(probit)) has.ord && !is.mcpls else probit
-  is.mlm    <- length(lme4.syntax) > 0L
+  COALLESCE <- \(x, y) if (is.null(x)) isTRUE(y) else isTRUE(x)
+
+  has.ord            <- length(ordered) > 0L
+  is.mlm             <- length(lme4.syntax) > 0L
+  is.mcpls           <- COALLESCE(mcpls, has.ord && (is.nlin || is.lower.order))
+  is.probit          <- COALLESCE(probit, has.ord && !is.mcpls)
+  mc.fast.lmer       <- COALLESCE(mc.fast.lmer, is.mcpls)
 
   list(
     syntax       = syntax,
@@ -93,7 +145,9 @@ parseModelArguments <- function(parTable,
     is.probit    = is.probit,
     is.mcpls     = is.mcpls,
     is.mlm       = is.mlm,
-    consistent   = consistent && !is.mcpls
+    mc.fast.lmer = mc.fast.lmer,
+    consistent   = consistent && (!is.mcpls || is.mlm) # Don't use consistency correction
+                                                       # for single-level MC-PLS models
   )
 }
 

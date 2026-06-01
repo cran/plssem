@@ -10,15 +10,14 @@ m <- '
 
 testthat::expect_no_error({
   fit <- pls(m, modsem::oneInt, bootstrap = TRUE, boot.R = 100,
-             boot.parallel = "snow", boot.ncpus = 2)
+             boot.parallel = "snow", boot.ncores = 2)
   summary(fit)
 })
 
 
 testthat::expect_no_error({
-  fit <- pls(m, oneIntOrdered, bootstrap = TRUE, boot.R = 50,
-             boot.parallel = "multicore", boot.ncpus = 4,
-             boot.optimize = TRUE)
+  fit <- pls(m, oneIntOrdered, bootstrap = TRUE, boot.R = 500,
+             boot.parallel = "multicore", boot.ncores = 4)
   summary(fit)
 })
 

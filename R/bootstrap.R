@@ -1,70 +1,91 @@
 bootstrap <- function(model,
                       zero.tol = 1e-10,
-                      verbose  = model$info$verbose,
-                      parallel = model$info$boot$parallel,
-                      ncpus    = model$info$boot$ncpus,
-                      R        = model$info$boot$R,
-                      iseed    = model$info$boot$iseed) {
+                      verbose  = model@info$verbose,
+                      parallel = model@info$boot$parallel,
+                      ncores   = model@info$boot$ncores,
+                      R        = model@info$boot$R,
+                      iseed    = model@info$boot$iseed) {
 
-  # The logic here follows the lavaan package
-  is.mc <- is.snow <- FALSE
   if (is.null(parallel)) parallel <- "no"
-  parallel <- match.arg(parallel, c("no", "multicore", "snow"))
+  parallel <- match.arg(parallel, c("no", "multicore", "multisession", "snow"))
+  if (parallel == "snow") parallel <- "multisession"
 
-  data      <- model$data
-  cluster   <- model$info$cluster
-  is.probit <- model$info$is.probit
-  is.mcpls  <- model$info$is.mcpls
-  ordered   <- model$info$ordered
-  results   <- vector("list", R)
-  verbose   <- verbose && !is.snow
+  data        <- model@data
+  cluster     <- model@info$cluster
+  is.probit   <- model@info$is.probit
+  is.mcpls    <- model@info$is.mcpls
+  ordered     <- model@info$ordered
+  results     <- vector("list", R)
+  mc.delta.se <- model@info$mc.args$delta.se
 
-  model.base <- model
+  # Check misspecified user arguments
+  pls_warnif(
+    parallel != "no" && ncores <= 1L,
+    "The `boot.ncores` argument has to be larger than 1 for parallel\n",
+    "bootstrapping to be enabled! Try `boot.ncores = 2`"
+  )
 
-  boot.optimize <- isTRUE(model$info$boot$optimize)
+  pls_warnif(
+    parallel == "no" && ncores > 1L,
+    'The `boot.parallel` must be "multicore" or "multisession" for parallel\n',
+    'bootstrapping to be enabled! Try `boot.parallel="multisession"`'
+  )
+
+  baseModel <- model
+
+  if (mc.delta.se && is.mcpls) {
+    combinedModel(baseModel) <- NULL
+    isMCPLS(baseModel, recursive = TRUE) <- FALSE
+  }
+
+  boot.optimize <- isTRUE(model@info$boot$optimize)
   mc.boot.control <- prepMCBootControl(
-    boot.control  = model$info$boot$mc.boot.control,
+    boot.control  = model@info$boot$mc.boot.control,
     boot.optimize = boot.optimize,
     model         = model
   )
 
-  progress <- function(i) {
-    available <- getOption("width")
-    available <- if (is.null(available)) 80L else available
-    len.out   <- max(40L, min(available - 20L, 60L))
+  combinedCoefs <- combinedModel(model)@params$values
+  # parTemplate might be stale with mc.delta=TRUE...
+  
+  parTemplate <- stats::setNames(
+    rep(NA_real_, length(combinedCoefs)),
+    names(combinedCoefs)
+  )
 
-    finished <- floor((i / R) * len.out)
-    left     <- len.out - finished
+  formatBootPars <- function(par) {
+    out <- parTemplate
 
-    printf(
-      paste0("\rBootstrap [%i] |", strrep("=", finished), strrep(" ", left), "|"), R
-    )
+    want <- names(combinedCoefs)
+    have <- names(par)
+    common <- intersect(have, want)
+
+    if (length(common))
+      out[common] <- par[common]
+
+    out
   }
 
-  na.par <- stats::setNames(rep(NA_real_, length(model$params$values)),
-                            names(model$params$values))
-
-  P_START <- model$info$mc.args$p.start
+  P_START <- model@info$mc.args$p.start
 
   .bootf <- function(i) {
-    if (verbose) progress(i)
-
     tryCatch({
       sampleData <- resample(data, cluster = cluster)
       sampleS    <- getCorrMat(sampleData, ordered = ordered, probit = is.probit)
-      model.b    <- model.base
+      model.b    <- baseModel
 
-      model.b$submodels$firstOrder$data       <- sampleData
-      model.b$submodels$firstOrder$matrices$S <- sampleS
+      model.b@data       <- sampleData
+      model.b@matrices$S <- sampleS
 
-      mc.args         <- model.b$info$mc.args
-      boot.fixed.seed <- mc.boot.control$fixed.seed
-      boot.polyak     <- mc.boot.control$polyak.juditsky
-      boot.tol        <- mc.boot.control$tol
-      boot.reps       <- mc.boot.control$mc.reps
-      boot.p.start    <- if (mc.boot.control$reuse.p.start) P_START else NULL
-      boot.verbose    <- mc.boot.control$verbose
-      low.tol.penalty <- mc.boot.control$low.tol.penalty
+      mc.args             <- model.b@info$mc.args
+      boot.fixed.seed     <- mc.boot.control$fixed.seed
+      boot.polyak         <- mc.boot.control$polyak.juditsky
+      boot.pj.extrapolate <- mc.boot.control$pj.extrapolate
+      boot.tol            <- mc.boot.control$tol
+      boot.reps           <- mc.boot.control$mc.reps
+      boot.p.start        <- if (mc.boot.control$reuse.p.start) P_START else NULL
+      boot.verbose        <- mc.boot.control$verbose
+      low.tol.penalty     <- mc.boot.control$low.tol.penalty
 
       utils::capture.output(type = "message", { # capture real time output
 
@@ -74,6 +95,7 @@ bootstrap <- function(model,
           fixed.seed      = boot.fixed.seed,
           verbose         = boot.verbose,
           polyak.juditsky = boot.polyak,
+          pj.extrapolate  = boot.pj.extrapolate,
           tol             = boot.tol,
           mc.reps         = boot.reps,
           p.start         = boot.p.start
@@ -81,9 +103,11 @@ bootstrap <- function(model,
 
       })
 
-      par <- model.b$params$values
+      par <- formatBootPars(
+        modelParams(combinedModel(model.b))$values
+      )
 
-      if (low.tol.penalty > 0 && is.mcpls) {
+      if (low.tol.penalty > 0 && is.mcpls && !mc.delta.se) {
         k <- length(par)
         par <- par + stats::rnorm(k, mean = 0, sd = low.tol.penalty)
       }
@@ -92,28 +116,18 @@ bootstrap <- function(model,
       par
 
     }, error = \(e) {
-      warning("Bootstrap replicate ", i, " failed: ", conditionMessage(e))
+      pls_msg_warn(
+        paste0("Bootstrap replicate ", i, " failed: ", conditionMessage(e))
+      )
 
-      par <- na.par
+      par <- parTemplate
       attr(par, "id") <- i
       par
     })
   }
 
-
-  if (parallel != "no" && ncpus > 1L) {
-    switch(
-      parallel,
-      multicore = { is.mc   <- .Platform$OS.type != "windows" },
-      snow      = { is.snow <- TRUE                           },
-                  { ncpus   <- 1L                             }
-    )
-
-    loadNamespace("parallel") # before recording seed!
-  }
-
   # iseed:
-  # this is adapted from the Lavaan package
+  # this is adapted from the lavaan package
   # - iseed is used for both serial and parallel
   # - if iseed is not set, iseed is generated + .Random.seed created/updated
   #     -> tmp.seed <- NA
@@ -143,52 +157,133 @@ bootstrap <- function(model,
     }
   }
 
-  if (!(ncpus > 1L && (is.mc || is.snow))) { # Only for serial
+  if (verbose) pls_msg_note("Bootstrapping...")
+
+  workers <- if (parallel == "no") 1L else ncores
+  if (workers <= 1L) {
     set.seed(iseed)
-  }
 
-  # this is adapted from the boot function in package boot
-  if (ncpus > 1L && (is.mc || is.snow)) {
+    if (verbose) {
+      pb <- utils::txtProgressBar(
+        min     = 0,
+        max     = R,
+        initial = 0,
+        style   = 3,
+        file    = stderr()
+      )
 
-    if (is.mc) {
-      RNGkind("L'Ecuyer-CMRG") # to allow for reproducible results
-      set.seed(iseed)
-      results <- parallel::mclapply(seq_len(R), .bootf, mc.cores = ncpus)
+      on.exit(close(pb), add = TRUE)
 
-    } else if (is.snow) {
+      results <- lapply(seq_len(R), function(i) {
+        tryCatch(
+          utils::setTxtProgressBar(pb, i),
+          error = \(e) pls_msg_warn(
+            paste0("Unable to update progress bar!\nMessage: ", conditionMessage(e))
+          )
+        )
 
-      cl <- parallel::makePSOCKcluster(rep("localhost", ncpus))
-      on.exit(parallel::stopCluster(cl), add = TRUE)
+        .bootf(i)
+      })
 
-      # Ensure workers have the package namespace loaded so internal helper
-      # functions referenced by `.bootf` resolve correctly.
-      parallel::clusterEvalQ(cl, loadNamespace("plssem"))
-
-      # No need for
-      # if(RNGkind()[1L] == "L'Ecuyer-CMRG")
-      # clusterSetRNGStream() always calls `RNGkind("L'Ecuyer-CMRG")`
-      parallel::clusterSetRNGStream(cl, iseed = iseed)
-      results <- parallel::parLapply(cl, seq_len(R), .bootf)
+    } else {
+      results <- lapply(seq_len(R), .bootf)
 
     }
 
   } else {
-    results <- lapply(seq_len(R), .bootf)
+    oldPlan <- future::plan()
+    on.exit(future::plan(oldPlan), add = TRUE)
 
-  }
+    if (parallel == "multicore" && .Platform$OS.type == "windows") {
+      pls_msg_warn(paste0(
+        "The `boot.parallel = 'multicore'` option is not supported on Windows.\n",
+        "Falling back to `boot.parallel = 'multisession'`."
+      ))
+      parallel <- "multisession"
+    }
 
-  if (verbose) {
-    progress(R)
-    cat("\n")
+    if (parallel == "multicore") {
+      future::plan(future::multicore, workers = workers)
+    } else {
+      future::plan(future::multisession, workers = workers)
+    }
+
+    if (verbose) {
+      results <- progressr::with_progress({
+        oldHandlers <- progressr::handlers()
+        on.exit(progressr::handlers(oldHandlers), add = TRUE)
+        progressr::handlers(progressr::handler_txtprogressbar(
+          file = stderr(),
+          style = 3L
+        ))
+        p <- progressr::progressor(along = seq_len(R))
+        future.apply::future_lapply(
+          X = seq_len(R),
+          FUN = function(i) {
+            p(sprintf("Bootstrap %d/%d", i, R))
+            .bootf(i)
+          },
+          future.seed = iseed,
+          future.packages = "plssem"
+        )
+      })
+
+    } else {
+      results <- future.apply::future_lapply(
+        X = seq_len(R),
+        FUN = .bootf,
+        future.seed = iseed,
+        future.packages = "plssem"
+      )
+    }
   }
 
   ids <- vapply(results, FUN.VALUE = integer(1L), FUN = \(x) attr(x, "id"))
 
   resultsMat <- do.call(rbind, results)
   rownames(resultsMat) <- ids
-  colnames(resultsMat) <- names(model$params$values)
+  colnames(resultsMat) <- names(combinedModel(model)@params$values)
 
   vcov <- stats::cov(resultsMat, use = "complete.obs")
+
+  if (mc.delta.se) {
+    combined <- combinedModel(model)
+    params <- modelParams(combined)
+
+    if (!is.null(params$Jacobian)) {
+      Jacobian <- params$Jacobian
+      pars <- intersect(colnames(Jacobian), colnames(vcov))
+
+      vcov.sub <- vcov[pars, pars, drop = FALSE]
+      J <- Jacobian[pars, pars, drop = FALSE]
+
+      tryCatch({
+        # Try to invert J
+        J.inv <- tryCatch(
+          solve(J),
+          error = function(e) {
+            pls_msg_warn("Jacobian is not positive definite!")
+            MASS::ginv(J)
+          }
+        )
+
+        vcov.mc <- J.inv %*% vcov.sub %*% t(J.inv)
+        
+        vcov[] <- 0
+        vcov[pars, pars] <- vcov.mc[pars, pars]
+
+      }, error = function(e) {
+        pls_msg_warn(
+          "Calculation of delta standard errors failed!",
+          "Consider trying `mc.delta.se=FALSE` instead.",
+          "Message:", conditionMessage(e)
+        )
+
+        vcov[] <<- NA_real_
+      })
+    }
+  }
+
   se <- sqrt(diag(vcov))
   se[se <= zero.tol] <- NA_real_
 
@@ -202,10 +297,10 @@ resample <- function(X, n.out = NROW(X), cluster = NULL, replace = TRUE) {
     return(X[idx, , drop = FALSE])
   }
 
-  stopif(length(cluster) > 1L, "bootstrapping of multiple cluster variables is not implemented (yet)!")
+  pls_stopif(length(cluster) > 1L, "bootstrapping of multiple cluster variables is not implemented (yet)!")
 
   cluster.vals <- attr(X, "cluster")[, cluster, drop = TRUE]
-  stopif(NROW(cluster.vals) != NROW(X), "Cluster must be of same length as data!")
+  pls_stopif(NROW(cluster.vals) != NROW(X), "Cluster must be of same length as data!")
 
   clusters <- unique(cluster.vals)
   G <- length(clusters)
@@ -235,6 +330,7 @@ CONFIG_BOOT_CONTROL <- list(
   reuse.p.start   = TRUE,
   fixed.seed      = TRUE,
   polyak.juditsky = TRUE,
+  pj.extrapolate  = TRUE,
   tol.mult        = 2,
   mc.reps.mult    = 0.5,
   verbose         = FALSE,
@@ -243,7 +339,7 @@ CONFIG_BOOT_CONTROL <- list(
 
 
 prepMCBootControl <- function(boot.control, boot.optimize, model) {
-  mc.args <- model$info$mc.args
+  mc.args <- model@info$mc.args
 
   if (!boot.optimize) {
     # Overwrite fields by arguments in mc.args
@@ -253,6 +349,7 @@ prepMCBootControl <- function(boot.control, boot.optimize, model) {
     boot.control$min.iter        <- mc.args$min.iter
     boot.control$max.iter        <- mc.args$max.iter
     boot.control$polyak.juditsky <- mc.args$polyak.juditsky
+    boot.control$pj.extrapolate  <- mc.args$pj.extrapolate
     boot.control$reuse.p.start   <- FALSE
     boot.control$fixed.seed      <- mc.args$fixed.seed
     boot.control$tol             <- mc.args$tol
@@ -268,9 +365,12 @@ prepMCBootControl <- function(boot.control, boot.optimize, model) {
 
   if (is.null(boot.control$max.iter))
     boot.control$max.iter <- CONFIG_BOOT_CONTROL$max.iter
-  
+
   if (is.null(boot.control$polyak.juditsky))
     boot.control$polyak.juditsky <- CONFIG_BOOT_CONTROL$polyak.juditsky
+
+  if (is.null(boot.control$pj.extrapolate))
+    boot.control$pj.extrapolate <- CONFIG_BOOT_CONTROL$pj.extrapolate
 
   if (is.null(boot.control$reuse.p.start))
     boot.control$reuse.p.start <- CONFIG_BOOT_CONTROL$reuse.p.start

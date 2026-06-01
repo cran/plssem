@@ -58,10 +58,10 @@ rescaleOrderedVariableMonteCarlo <- function(name,
 
     if (any(idx)) {
       mu[i] <- mean(y[idx])
-      sim.y.rescaled[idx] <- mu[i] 
+      sim.y.rescaled[idx] <- mu[i]
     }
   }
-  
+
   # exact centering to remove residual drift (weighted by observed category probs)
   mu <- mu - sum(p_obs * mu, na.rm = TRUE)
 
@@ -91,7 +91,7 @@ rescaleOrderedVariableAnalytic <- function(name,
   tab <- as.numeric(table(x))
   K   <- length(tab)
   n   <- sum(tab)
-  if (K < 2) stop("Need at least 2 ordered categories for '", name, "'.")
+  if (K < 2) pls_msg_stop(paste0("Need at least 2 ordered categories for '", name, "'."))
 
   if (smooth_eps > 0) {
     p_hat <- (tab + smooth_eps) / (n + K * smooth_eps)

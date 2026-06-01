@@ -1,8 +1,9 @@
 ## ----include = FALSE----------------------------------------------------------
-EVAL_DEFAULT <- FALSE
+EVAL_DEFAULT <- identical(Sys.getenv("PLSSEM_VIGNETTES"), "true")
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment = "#>"
+  comment = "#>",
+  eval = TRUE
 )
 
 ## ----setup--------------------------------------------------------------------
