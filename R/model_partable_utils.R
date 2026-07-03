@@ -1,7 +1,18 @@
-getIntTerms <- function(parTable) {
-  cond1 <- grepl(":", parTable$rhs)
-  cond2 <- !grepl("\\(|\\)\\|", parTable$rhs)
-  unique(parTable[cond1 & cond2, "rhs"])
+getIntTerms <- function(parTable, col = "rhs") {
+  cond1 <- grepl(":", parTable[[col]])
+  cond2 <- !grepl("~|\\(|\\)\\|", parTable[[col]])
+  cond3 <- parTable$op == "~"
+
+  unique(parTable[cond1 & cond2 & cond3, col])
+}
+
+
+checkLhsIntTerms <- function(parTable) {
+  bad <- getIntTerms(parTable, col = "lhs")
+  pls_stopif(length(bad),
+    "Interaction terms can (currently) not be treated as dependent variables!",
+    "Independent variable interaction terms:", paste0(bad, collapse = ", ")
+  )
 }
 
 
@@ -37,10 +48,17 @@ getReflectiveIndicators <- function(..., op = "=~") {
 }
 
 
+# Variables explicitly declared as path-less structural nodes (e.g. `x ~ 1`).
+getDeclaredStructVars <- function(parTable) {
+  unique(parTable[parTable$op == ADDITIONAL_STRUCT_VAR_OP, "lhs"])
+}
+
+
 getOVs <- function(parTable) {
   lVs    <- getLVs(parTable)
   select <- parTable$op %in% c("=~", "~", "~~", "<~")
-  vars   <- unique(c(parTable$lhs[select], parTable$rhs[select]))
+  vars   <- unique(c(parTable$lhs[select], parTable$rhs[select],
+                     getDeclaredStructVars(parTable)))
 
   vars[!vars %in% lVs & !grepl(":", vars)]
 }
@@ -48,26 +66,12 @@ getOVs <- function(parTable) {
 
 getStructVars <- function(parTable) {
   struct <- parTable[parTable$op == "~", , drop = FALSE]
-  unique(c(struct$lhs, struct$rhs))
-}
-
-
-getCovOnlyVars <- function(parTable) {
-  covRows <- parTable[parTable$op == "~~", , drop = FALSE]
-  if (!NROW(covRows)) return(NULL)
-
-  covVars <- unique(c(covRows$lhs, covRows$rhs))
-  inds    <- getIndicators(parTable)
-
-  setdiff(covVars, inds)
+  unique(c(struct$lhs, struct$rhs, getDeclaredStructVars(parTable)))
 }
 
 
 getStructOVs <- function(parTable) {
-  struct <- getStructVars(parTable)
-  cov    <- getCovOnlyVars(parTable)
-
-  intersect(union(struct, cov), getOVs(parTable))
+  intersect(getStructVars(parTable), getOVs(parTable))
 }
 
 
@@ -186,4 +190,38 @@ getHigherOrderLVs <- function(parTable) {
 getParTableFromParNames <- function(parnames) {
   split <- splitParameterNames(parnames)
   data.frame(lhs = split$lhs, op = split$op, rhs = split$rhs, stringsAsFactors = FALSE)
+}
+
+
+getParNamesFromParTable <- function(parTable) {
+  paste0(parTable$lhs, parTable$op, parTable$rhs)
+}
+
+
+hasResidualCovariances <- function(parTable) {
+  etas <- unique(parTable[parTable$op == "~", "lhs"])
+
+  any(
+    parTable$op == "~~" &
+    (parTable$rhs %in% etas | parTable$lhs %in% etas) &
+    parTable$lhs != parTable$rhs
+  )
+}
+
+
+addReverseCovariancesToParTable <- function(parTable) {
+  # The covariance x~~y can be specified as y~~x. If the user supplies
+  # important information to one of these (e.g., y ~~ start(0.1) * x)
+  # there is a risk that we internally represent the covariance as the opposite
+  # (e.g., x~~y). To address this, we can add both directions to the parTable
+  is.cov <- parTable$op == "~~" & parTable$lhs != parTable$rhs
+
+  if (!any(is.cov))
+    return(parTable)
+
+  parTableCov <- parTable[is.cov, , drop = FALSE]
+  parTableCov$lhs <- parTable[is.cov, "rhs"]
+  parTableCov$rhs <- parTable[is.cov, "lhs"]
+
+  rbind(parTable, parTableCov)
 }

@@ -17,7 +17,7 @@ getPLS_Data <- function(data,
   pls_stopif(any(varIsMissing),
              "Missing variables: ", paste0(vars[varIsMissing], collapse = ", "))
 
-  data <- as.data.frame(data)[vars]
+  data <- asDataFrame(data)[vars]
 
   if (!is.null(cluster)) {
     clusterMissing <- !stats::complete.cases(data[, cluster, drop = FALSE])
@@ -69,12 +69,20 @@ getPLS_Data <- function(data,
       cluster = cluster
     )
 
+    # sd's are a natural byproduct of standardizing
+    scale <- attr(data, "sigma")
+
   } else {
     pls_msg_warn(paste0(
       "The `pls()` function usually assumes that the data is standardized!\n",
       "Setting `standardized=FALSE` may have unexpected side effects!"
     ))
 
+    scale <- stats::setNames(vapply(
+      X         = data[,indicators, drop = FALSE],
+      FUN.VALUE = numeric(1L),
+      FUN       = stats::sd, na.rm = TRUE
+    ), nm = indicators)
   }
 
   S <- getCorrMat(data[indicators], probit = is.probit, ordered = ordered)
@@ -87,12 +95,12 @@ getPLS_Data <- function(data,
     attr(X, "cluster") <- data[, cluster, drop = FALSE]
   }
 
-  list(X = X, S = S)
+  list(X = X, S = S, scale = scale)
 }
 
 
 checkAndFixDTypesPLS_Data <- function(X, check = colnames(X)) {
-  if (!is.data.frame(X)) X <- as.data.frame(X)
+  if (!is.data.frame(X)) X <- asDataFrame(X)
 
   varIsMissing <- !check %in% colnames(X)
   pls_stopif(any(varIsMissing),
@@ -133,12 +141,26 @@ standardizeDataFrame <- function(data, cluster = NULL, subset = colnames(data)) 
   Z <- lapply(data[subset], FUN = standardizeAtomic)
   data[subset] <- Z
 
+  mu <- vapply(Z, FUN.VALUE = numeric(1L), FUN = \(x) attr(x, "mu"))
+  sigma <- vapply(Z, FUN.VALUE = numeric(1L), FUN = \(x) attr(x, "sigma"))
+  names(mu) <- names(sigma) <- subset
+
+  attr(data, "mu") <- mu
+  attr(data, "sigma") <- sigma
+
   data
 }
 
 
 standardizeAtomic <- function(x) {
-  (x - mean(x, na.rm = TRUE)) / stats::sd(x, na.rm = TRUE)
+  mu <- mean(x, na.rm = TRUE)
+  sigma <- stats::sd(x, na.rm = TRUE)
+
+  y <- (x - mu) / sigma
+  attr(y, "mu") <- mu
+  attr(y, "sigma") <- sigma
+
+  y
 }
 
 
@@ -148,10 +170,8 @@ cov2cor <- function(vcov) {
 
   sd <- sqrt(abs(diag(vcov))) # use `abs()`, in case some variances are negative
 
-  if (length(sd) == 1L) D <- matrix(1 / sd, nrow = 1L, ncol = 1L)
-  else                  D <- diag(1 / sd)
-
-  structure(D %*% vcov %*% D, dimnames = dimnames(vcov))
+  # equivalent to diag(1/sd) %*% vcov %*% diag(1/sd), but O(p^2) instead of O(p^3)
+  structure(vcov / tcrossprod(sd), dimnames = dimnames(vcov))
 }
 
 
@@ -161,16 +181,43 @@ getCorrMat <- function(data, probit = FALSE, ordered = NULL) {
 }
 
 
-getPearsonCorr <- function(data) {
+getPearsonCorr <- function(data, zero.tol = 1e-8) {
   if (!is.matrix(data))
     data <- as.matrix(data)
 
-  Rfast::cora(data)
+  pls_stopif(!NROW(data) || !NCOL(data), "data has zero rows/columns!")
+
+  # Get (co-)variances, so that we can check for NA/zero variances
+  S <- Rfast::cova(data)
+  v <- diag(S)
+
+  # Flag NA or (near-)constant columns. The threshold is relative to each
+  # variable's own mean-square (`data` need not be standardized, so an
+  # absolute cut-off is not scale-robust). Since `v <= mean(x^2)`, the ratio
+  # `v / msq` lies in [0, 1] and is 0 exactly for a constant colu"mn.
+  msq     <- colMeans(data^2)
+  zerovar <- is.na(v) | v <= zero.tol * msq
+
+  # Any NA/zero variances?
+  if (any(zerovar)) {
+    nm <- colnames(data)
+
+    if (!length(nm)) # what if we have no colnames?
+      nm <- paste0("x", seq_len(NCOL(S)))
+
+    pls_msg_stop(
+      "Some variables have zero or NA variances!",
+      paste0(paste0(nm[zerovar], "=", v[zerovar]), collapse = ", ")
+    )
+  }
+
+  # Return correlations
+  cov2cor(S)
 }
 
 
 getPolyCorr <- function(data, ordered = NULL) {
-  data <- as.data.frame(data)
+  data <- asDataFrame(data)
   lavaan::lavCor(data, ordered = ordered)
 }
 
@@ -179,4 +226,17 @@ tetracor <- function(x, y) {
   # x is continous, y is ordinal
   X <- data.frame(x, y)
   lavaan::lavCor(X, ordered = "y")[1, 2]
+}
+
+
+asDataFrame <- function(data) {
+  tryCatch(
+    data <- as.data.frame(data),
+    error = function(e) {
+      pls_msg_stop(
+        "Could not convert `data` to a `data.frame`!",
+        "Message:", conditionMessage(e)
+      )
+    }
+  )
 }

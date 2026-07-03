@@ -28,23 +28,49 @@ setMethod("show", "PlsModel", function(object) {
 #'
 #' @param object A \code{PlsModel} object.
 #' @param fit Logical; whether to compute fit measures.
-#' @param ... Currently unused.
+#' @param unstandardized Logical; Should unstandardized estiamtes be included?
+#' @param ... Arguments passes to \code{\link{unstandardized_estimates}}.
 #' @return A \code{SummaryPlsSem} list with formatted results.
 #' @export
-setMethod("summary", "PlsModel", function(object, fit = TRUE, ...) {
-  combined <- combinedModel(object)
-  parTable <- parameter_estimates(combined)
+setMethod("summary", "PlsModel", function(object, fit = TRUE, unstandardized = FALSE, ...) {
 
-  lvs    <- getLVs(parTable)
-  ovs    <- getOVs(parTable)
-  etas   <- getEtas(parTable, checkAny = FALSE)
-  inds   <- getIndicators(parTable)
-  inds.a <- getReflectiveIndicators(parTable)
+  combined   <- combinedModel(object)
+  parTable   <- parameter_estimates(combined)
+  lvs        <- getLVs(parTable)
+  ovs        <- getOVs(parTable)
+  etas       <- getEtas(parTable, checkAny = FALSE)
+  inds       <- getIndicators(parTable)
+  inds.a     <- getReflectiveIndicators(parTable)
+  is.probit  <- combined@info$is.probit
+  ordered    <- combined@info$ordered
+  is.mcpls   <- combined@info$is.mcpls
+  extra.cols <- NULL
 
-  strParTableLines <- utils::capture.output(modsem::summarize_partable(parTable))
-  strParTable <- paste0(paste0(strParTableLines[-(1:6)], collapse = "\n"), "\n")
+  if (unstandardized) {
+    tryCatch({
 
-  is.ord <- combined@info$is.probit || (length(combined@info$ordered) && combined@info$is.mcpls)
+      # we don't need any standard errors, so save the computation
+      parTableu <- unstandardized_estimates(object, se = "none", ...)
+
+      idx0 <- paste0(parTable$lhs, parTable$op, parTable$rhs)
+      idx1 <- paste0(parTableu$lhs, parTableu$op, parTableu$rhs)
+   
+      parTable$Unstd <- parTableu$est[match(idx0, idx1)]
+      extra.cols <- c(extra.cols, "Unstd")
+
+    }, error = function(e) {
+
+      pls_msg_warn(
+        "Calculation of unstandardized estimates failed!",
+        "Message:", conditionMessage(e)
+      )
+
+    })
+  }
+
+  width.out <- plsGetWidthPrintedParTable(parTable)
+
+  is.ord <- is.probit || (length(ordered) && is.mcpls)
   link   <- if (is.ord) "PROBIT" else "LINEAR"
 
   getR2 <- function(x, pt = parTable) {
@@ -56,9 +82,10 @@ setMethod("summary", "PlsModel", function(object, fit = TRUE, ...) {
   r2.inds <- vapply(inds.a, FUN.VALUE = numeric(1L), FUN = getR2)
 
   out <- list(
+    parTable = parTable,
     print = list(
-      strParTable = strParTable,
-      width       = max(nchar(strParTableLines))
+      width      = width.out,
+      extra.cols = extra.cols
     ),
     fit  = object,
     info = list(
@@ -150,7 +177,7 @@ print.SummaryPlsSem <- function(x, ...) {
                      width.out = width.out), "\n", sep = "")
   }
 
-  cat(x$print$strParTable)
+  plsPrintParTable(x$parTable, extra.cols = x$print$extra.cols)
   invisible(x)
 }
 
@@ -267,6 +294,37 @@ setMethod("boot", "PlsModel", function(object) {
 })
 
 
+#' Retrieve bootstrap coefficient matrix
+#'
+#' @param object A fitted model object.
+#' @return A \code{PlsSemMatrix} of bootstrap replicate parameter vectors
+#'   (rows = replicates, cols = parameters).
+#'
+#' @examples
+#' library(modsem)
+#' library(plssem)
+#'
+#' m <- "
+#'   X =~ x1 + x2 + x3
+#'   Z =~ z1 + z2 + z3
+#'   Y =~ y1 + y2 + y3
+#'   Y ~ X + Z + X:Z
+#' "
+#'
+#' fit <- pls(m, oneInt, bootstrap = TRUE, boot.R = 50)
+#' pls_boot(fit)
+#'
+#' @export
+setGeneric("pls_boot", function(object) standardGeneric("pls_boot"))
+
+#' @rdname boot
+#' @export
+setMethod("pls_boot", "PlsModel", function(object) {
+  object <- combinedModel(object)
+  plssemMatrix(object@boot$boot, is.public = TRUE)
+})
+
+
 
 #' Check whether a fitted model has admissible parameter estimates
 #'
@@ -295,13 +353,13 @@ setMethod("is_admissible", "PlsModel", function(object) isAdmissible(object))
 #' @return A [PlsSemMatrix].
 #' @export
 setGeneric(
-  "implied_construct_corr",
-  function(object, saturated = FALSE, mc.reps = 1e6, ...) standardGeneric("implied_construct_corr")
+  "pls_implied_construct_corr",
+  function(object, saturated = FALSE, mc.reps = 1e6, ...) standardGeneric("pls_implied_construct_corr")
 )
 
-#' @rdname implied_construct_corr
+#' @rdname pls_implied_construct_corr
 #' @export
-setMethod("implied_construct_corr", "PlsModel",
+setMethod("pls_implied_construct_corr", "PlsModel",
           function(object, saturated = FALSE, mc.reps = 1e6, ...) {
   plssemMatrix(
     impliedConstructCorrMat(object, saturated = saturated, mc.reps = mc.reps),
@@ -324,18 +382,136 @@ setMethod("implied_construct_corr", "PlsModel",
 #' @return A numeric matrix.
 #' @export
 setGeneric(
-  "implied_indicator_corr",
-  function(object, saturated = FALSE, mc.reps = 1e6, ...) standardGeneric("implied_indicator_corr")
+  "pls_implied_indicator_corr",
+  function(object, saturated = FALSE, mc.reps = 1e6, ...) standardGeneric("pls_implied_indicator_corr")
 )
 
 
-#' @rdname implied_indicator_corr 
+#' @rdname pls_implied_indicator_corr
 #' @export
-setMethod("implied_indicator_corr", "PlsModel",
+setMethod("pls_implied_indicator_corr", "PlsModel",
           function(object, saturated = FALSE, mc.reps = 1e6, ...) {
   plssemMatrix(
     impliedIndicatorCorrMat(object, saturated = saturated, mc.reps = mc.reps),
     is.public = TRUE
+  )
+})
+
+
+#' Implied Joint Correlation Matrix
+#'
+#' Returns the joint implied correlation matrix of the observed and latent
+#' variables for a fitted model.
+#'
+#' For higher-order models, this is computed for the combined model returned by
+#' [combinedModel()].
+#'
+#' @param object A fitted [PlsModel] object.
+#' @param saturated Logical; if `TRUE`, return the saturated implied matrix.
+#' @param mc.reps Integer; number of Monte Carlo resamples used for MC-PLSc.
+#' @param ... Reserved for future extensions.
+#' @return A [PlsSemMatrix].
+#' @export
+setGeneric(
+  "pls_implied_joint_corr",
+  function(object, saturated = FALSE, mc.reps = 1e6, ...) standardGeneric("pls_implied_joint_corr")
+)
+
+
+#' @rdname pls_implied_joint_corr
+#' @export
+setMethod("pls_implied_joint_corr", "PlsModel",
+          function(object, saturated = FALSE, mc.reps = 1e6, ...) {
+  plssemMatrix(
+    impliedJointCorrMat(object, saturated = saturated, mc.reps = mc.reps),
+    is.public = TRUE
+  )
+})
+
+
+#' Unstandardized Parameter Estimates
+#'
+#' Transform parameter estimates from a fitted PLS-SEM model to observed- and
+#' latent-variable scales. Variables not selected through \code{unstandardized}
+#' remain on their standardized scales.
+#'
+#' @param model A fitted \code{PlsModel} object.
+#' @param unstandardized Character vector naming variables to unstandardize, or
+#'   one of \code{"all"}, \code{"ov"}, or \code{"lv"}.
+#' @param se Character string selecting delta-method standard errors
+#'   (\code{"delta"}) or no standard errors (\code{"none"}).
+#' @param scale.uncertainty Should scale uncertainty be included?
+#'   defaults to \code{FALSE}.
+#' @param eps Positive numeric finite-difference step used for the delta-method
+#'   Jacobian.
+#' @param zero.tol Non-negative numeric tolerance below which standard errors
+#'   are returned as missing.
+#' @param rm.tmp.ov Logical; whether rows involving temporary observed
+#'   variables should be removed from the returned parameter table.
+#' @param clean.tmp.ind Logical; whether rows involving temporary indicators
+#'   should be cleaned from the returned parameter table.
+#' @param clean.tmp.mimic Logical; whether rows involving temporary mimic indicators
+#'   should be cleaned from the returned parameter table.
+#'
+#' @return A \code{PlsSemParTable} containing transformed estimates and (when
+#'   requested) delta-method standard errors. The transformed covariance matrix
+#'   is stored in the \code{"vcov"} attribute.
+#'
+#' @examples
+#' tpb <- '
+#' # Outer Model (Based on Hagger et al., 2007)
+#'   ATT <~ att1 + att2 + att3 + att4 + att5
+#'   SN =~ sn1 + sn2
+#'   PBC =~ pbc1 + pbc2 + pbc3
+#'   INT =~ int1 + int2 + int3
+#'   BEH <~ b1 + b2
+#'
+#' # Inner Model (Based on Steinmetz et al., 2011)
+#'   INT ~ ATT + SN + PBC
+#'   BEH ~ INT + PBC + INT:PBC
+#' '
+#'
+#' fit <- pls(tpb, modsem::TPB, bootstrap = TRUE, boot.R = 50)
+#' unstandardized_estimates(fit)
+#' @export
+setGeneric(
+  "unstandardized_estimates",
+  function(model,
+           unstandardized    = "all",
+           se                = c("delta", "none"),
+           scale.uncertainty = FALSE,
+           eps               = 1e-4,
+           zero.tol          = 1e-10,
+           rm.tmp.ov         = TRUE,
+           clean.tmp.ind     = TRUE,
+           clean.tmp.mimic   = TRUE)
+    standardGeneric("unstandardized_estimates")
+)
+
+
+#' @rdname unstandardized_estimates
+#' @export
+setMethod("unstandardized_estimates", "PlsModel",
+  function(model,
+           unstandardized    = "all",
+           se                = c("delta", "none"),
+           scale.uncertainty = FALSE,
+           eps               = 1e-4,
+           zero.tol          = 1e-10,
+           rm.tmp.ov         = TRUE,
+           clean.tmp.ind     = TRUE,
+           clean.tmp.mimic   = TRUE) {
+
+  plsUnstandardizedEstimates(
+    model             = model,
+    unstandardized    = unstandardized,
+    se                = se,
+    scale.uncertainty = scale.uncertainty,
+    eps               = eps,
+    zero.tol          = zero.tol,
+    rm.tmp.ov         = rm.tmp.ov,
+    clean.tmp.ind     = clean.tmp.ind,
+    clean.tmp.mimic   = clean.tmp.mimic
   )
 })
 
@@ -375,3 +551,119 @@ printModelStatusHeader <- function(model) {
     combined@status$iterations
   )
 }
+
+
+#' RMSEA
+#'
+#' Compute RMSEA for a PLS model.
+#'
+#' @param object A fitted [PlsModel] object.
+#' @param saturated Logical; if `TRUE`, compute the saturated fit.
+#' @param mc.reps Integer; number of Monte Carlo resamples used for MC-PLSc fit.
+#' @param ... Reserved for future extensions.
+#' @return RMSEA value
+#' @export
+setGeneric(
+  "pls_rmsea",
+  function(object, saturated = FALSE, mc.reps = 1e6, ...) standardGeneric("pls_rmsea")
+)
+
+
+#' @rdname pls_rmsea 
+#' @export
+setMethod("pls_rmsea", "PlsModel", function(object, saturated = FALSE, mc.reps = 1e6, ...) {
+  fitMeasures(object, saturated = saturated, mc.reps = mc.reps)$rmsea
+})
+
+
+#' SRMR
+#'
+#' Compute SRMR for a PLS model.
+#'
+#' @param object A fitted [PlsModel] object.
+#' @param saturated Logical; if `TRUE`, compute the saturated fit.
+#' @param mc.reps Integer; number of Monte Carlo resamples used for MC-PLSc fit.
+#' @param ... Reserved for future extensions.
+#' @return SRMR value
+#' @export
+setGeneric(
+  "pls_srmr",
+  function(object, saturated = FALSE, mc.reps = 1e6, ...) standardGeneric("pls_srmr")
+)
+
+
+#' @rdname pls_srmr 
+#' @export
+setMethod("pls_srmr", "PlsModel", function(object, saturated = FALSE, mc.reps = 1e6, ...) {
+  fitMeasures(object, saturated = saturated, mc.reps = mc.reps)$srmr
+})
+
+
+#' Chi-Square
+#'
+#' Compute Chi-Square value for a PLS model.
+#'
+#' @param object A fitted [PlsModel] object.
+#' @param saturated Logical; if `TRUE`, compute the saturated fit.
+#' @param mc.reps Integer; number of Monte Carlo resamples used for MC-PLSc fit.
+#' @param ... Reserved for future extensions.
+#' @return Chi-Square value
+#' @export
+setGeneric(
+  "pls_chisq",
+  function(object, saturated = FALSE, mc.reps = 1e6, ...) standardGeneric("pls_chisq")
+)
+
+
+#' @rdname pls_chisq 
+#' @export
+setMethod("pls_chisq", "PlsModel", function(object, saturated = FALSE, mc.reps = 1e6, ...) {
+  fitMeasures(object, saturated = saturated, mc.reps = mc.reps)$chisq
+})
+
+
+#' Chi-Square Degrees of Freedom
+#'
+#' Compute Chi-Square degrees of freedom for a PLS model.
+#'
+#' @param object A fitted [PlsModel] object.
+#' @param saturated Logical; if `TRUE`, compute the saturated fit.
+#' @param mc.reps Integer; number of Monte Carlo resamples used for MC-PLSc fit.
+#' @param ... Reserved for future extensions.
+#' @return Chi-Square degrees of freedom
+#' @export
+setGeneric(
+  "pls_chisq_df",
+  function(object, saturated = FALSE, mc.reps = 1e6, ...) standardGeneric("pls_chisq_df")
+)
+
+
+#' @rdname pls_chisq 
+#' @export
+setMethod("pls_chisq_df", "PlsModel", function(object, saturated = FALSE, mc.reps = 1e6, ...) {
+  fitMeasures(object, saturated = saturated, mc.reps = mc.reps)$chisq.df
+})
+
+
+#' Loglikelihood of MC-PLS parameters
+#'
+#' Compute Loglikelihood statistics for an MC-PLS model.
+#'
+#' @param object A fitted [PlsModel] object, using MC-PLS.
+#' @param boot.R Integer; Number of bootstrap replicates.
+#' @param verbose Logical; Should a progressbar be displayed?
+#' @param ... Reserved for future extensions.
+#' @return List with loglikelihood value, expected and observed auxiliary parameters,
+#'   and variance covariance matrix of the expected auxiliary parameters.
+#' @export
+setGeneric(
+  "mcpls_loglik",
+  function(object, boot.R = 500, verbose = interactive(), ...) standardGeneric("mcpls_loglik")
+)
+
+
+#' @rdname mcpls_loglik
+#' @export
+setMethod("mcpls_loglik", "PlsModel", function(object, boot.R = 500, verbose = interactive(), ...) {
+  mcplsLoglik(object, boot.R = boot.R, verbose = verbose)
+})

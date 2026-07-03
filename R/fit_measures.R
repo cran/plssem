@@ -94,6 +94,35 @@ impliedIndicatorCorrMat <- function(object, saturated = FALSE, mc.reps = 1e6) {
 }
 
 
+# Joint model-implied correlation matrix of observed and latent variables.
+# The observed-observed and latent-latent blocks reuse the canonical implied
+# helpers; the cross block is Cov(y, eta) = Lambda %*% Phi. The full loading
+# matrix is used so that associations running through single-indicator stand-in
+# latents (observed structural variables, composite-MIMIC reflective indicators)
+# are captured.
+impliedJointCorrMat <- function(object, saturated = FALSE, mc.reps = 1e6) {
+  Phi    <- impliedConstructCorrMat(object, saturated = saturated, mc.reps = mc.reps)
+  SigmaO <- impliedIndicatorCorrMat(object, saturated = saturated, mc.reps = mc.reps)
+
+  ovs <- rownames(SigmaO)
+  lvs <- colnames(Phi)
+
+  Lambda    <- matrix(0, nrow = length(ovs), ncol = length(lvs),
+                      dimnames = list(ovs, lvs))
+  fitLambda <- object@fit$fitLambda
+  ovs.f     <- intersect(ovs, rownames(fitLambda))
+  lvs.f     <- intersect(lvs, colnames(fitLambda))
+  Lambda[ovs.f, lvs.f] <- fitLambda[ovs.f, lvs.f]
+
+  cross <- Lambda %*% Phi # Cov(observed, latent)
+
+  rbind(
+    cbind(SigmaO, cross),
+    cbind(t(cross), Phi)
+  )
+}
+
+
 fitMeasures <- function(model, saturated = FALSE, mc.reps = 1e6) {
   tryCatch({
 
@@ -252,4 +281,187 @@ calcRMSEA <- function(chi.sq, df, N, ci.level = 0.90, close.h0 = 0.05) {
     list(rmsea = NA_real_, lower = NA_real_, upper = NA_real_,
          ci.level = NA_real_, pvalue = NA_real_, close.h0 = NA_real_)
   })
+}
+
+
+plsImpliedR2 <- function(object, output = c("all", "lv", "ov")) {
+  output <- match.arg(output)
+
+  parTable <- combinedModel(object)@parTable
+
+  getR2 <- function(x, pt = parTable) {
+    rvar <- pt[pt$lhs == x & pt$op == "~~" & pt$rhs == x, "est"]
+    if (!length(rvar)) 0 else 1 - rvar
+  }
+
+  etas <- getEtas(parTable, checkAny = FALSE)
+  inds.a <- getReflectiveIndicators(parTable)
+
+  r2.etas <- vapply(etas,   FUN.VALUE = numeric(1L), FUN = getR2)
+  r2.inds <- vapply(inds.a, FUN.VALUE = numeric(1L), FUN = getR2)
+
+  names(r2.etas) <- etas
+  names(r2.inds) <- inds.a
+
+  switch(output,
+    all = c(r2.inds, r2.etas),
+    lv  = r2.etas,
+    ov  = r2.inds
+  )
+}
+
+
+mcplsLoglik <- function(object, boot.R = 500, verbose = interactive()) {
+  combined <- combinedModel(object)
+  status   <- modelStatus(combined)
+
+  pls_stopif(!is_mcpls(combined),
+    "`mcpls_loglik()` is only implemented for MC-PLS models!"
+  )
+
+  par0 <- status$par0
+  fit0 <- status$fit0
+
+  pls_stopif(is.null(par0) || is.null(fit0),
+    "Missing auxiliary estimates! This is likely a bug!"
+  )
+
+  parTable <- getParTableEstimates(
+    combined, rm.tmp.ov = FALSE, clean.tmp.ind = FALSE
+  )
+
+  # Here we get a whole lot of code duplication compared to R/mcpls.R
+  # which isn't optimal.. The code is similar, but quite different as well...
+  data <- modelData(object)
+  vars <- colnames(data)
+  n    <- NROW(data)
+
+  if (isMLM(object)) {
+    clusterSizes <- as.numeric(table(attr(data, "cluster")))
+    clusterName  <- colnames(attr(data, "cluster"))
+  } else {
+    clusterSizes <- NULL
+    clusterName  <- NULL
+  }
+
+  estimator <- combined@info$path.estimator
+  mc.rescov <- object@info$mc.args$rescov
+  use.full.rescov <- switch(mc.rescov,
+    full    = TRUE,
+    reduced = FALSE,
+    auto    = estimator == "gls",
+    pls_msg_stop("Unrecognized value for `mc.rescov` argument:", mc.rescov)
+  )
+
+  is.hi.ord <- isTRUE(combined@info$is.high.ord)
+
+  .f <- function(i = 0, pb = NULL) {
+
+    if (!is.null(pb)) {
+      tryCatch(
+        utils::setTxtProgressBar(pb, i),
+        error = \(e) pls_msg_warn(
+          "Unable to update progress bar!\nMessage:", conditionMessage(e)
+        )
+      )
+    }
+
+    sim <- simulateDataParTable(
+      parTable     = parTable,
+      N            = n,
+      check.hi.ord = is.hi.ord,
+      clusterSizes = clusterSizes,
+      clusterName  = clusterName,
+      full         = use.full.rescov,
+      cut          = TRUE # cut from estimated thresholds
+    )
+
+    fit.sim <- fit0
+    X       <- Rfast::standardise(as.matrix(sim$ov[vars]))
+    S       <- Rfast::cova(X)
+
+    if (!is.null(sim$cluster))
+      attr(X, "cluster") <- sim$cluster
+
+    # Update observed-data (lowest-order) model input
+    modelData(fit.sim)  <- X
+    indCorrMatrix(fit.sim) <- S
+
+    fit2 <- estimatePLS_Inner(fit.sim)
+    par2 <- getFreeParamsTable(combinedModel(fit2))
+
+    par2[par0$is.free, "est"]
+  }
+
+  free0 <- par0[par0$is.free, , drop = FALSE]
+  nm0   <- getParNamesFromParTable(free0)
+
+  X <- matrix(NA_real_, nrow = boot.R, ncol = NROW(free0))
+  colnames(X) <- nm0
+
+  if (verbose) {
+    pb <- utils::txtProgressBar(
+      min     = 0,
+      max     = boot.R,
+      initial = 0,
+      style   = 3,
+      file    = stderr()
+    )
+
+    on.exit(close(pb), add = TRUE)
+
+  } else {
+    pb <- NULL
+
+  }
+
+  for (i in seq_len(boot.R)) {
+
+    X[i,] <- tryCatch(.f(i = i, pb = pb), error = function(e) {
+      pls_msg_warn("The %dth estimate failed! Message:", conditionMessage(e))
+      NA_real_
+    })
+
+  }
+
+  complete   <- stats::complete.cases(X)
+  X.complete <- X[complete, , drop = FALSE]
+  ncomplete  <- sum(complete)
+  nparams    <- NROW(free0)
+
+  pls_stopif(ncomplete <= nparams,
+    "Unable to compute `mcpls_loglik()` with a stable covariance matrix.",
+    sprintf(
+      "Only %d complete replicate(s) remain for %d free parameter(s).",
+      ncomplete, nparams
+    ),
+    "Increase `boot.R` or inspect warnings from failed estimates."
+  )
+
+  observed <- stats::setNames(free0$est, nm = nm0)
+  expected <- colMeans(X.complete)
+  sigma    <- stats::cov(X.complete)
+
+  loglik <- tryCatch(
+    mvnfast::dmvn(
+      X     = matrix(observed, nrow = 1L),
+      mu    = expected,
+      sigma = sigma,
+      log   = TRUE
+    ),
+    error = function(e) {
+      pls_msg_stop(
+        "Unable to compute `mcpls_loglik()` with a stable covariance matrix.",
+        "Increase `boot.R` or inspect warnings from failed estimates.",
+        "Message:", conditionMessage(e)
+      )
+    }
+  )
+
+  list(
+    observed = plssemVector(observed),
+    expected = plssemVector(expected),
+    sigma    = plssemMatrix(sigma),
+    loglik   = plssemVector(loglik)
+  )
 }

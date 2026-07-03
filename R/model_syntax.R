@@ -1,8 +1,9 @@
-TEMP_OV_PREFIX <- ".TEMP_OV__"
-TEMP_IND_SUFFIX <- "__TEMP_IND_"
+plsParseModelSyntax <- function(syntax) {
+  parTable <- modsem::modsemify(syntax, parentheses.as.string = TRUE)
+  parTable$start <- parseStartModifiers(parTable$mod)
+  parTable
+}
 
-TEMP_OV_PREFIX_PATTERN <- paste0("^", TEMP_OV_PREFIX)
-TEMP_IND_SUFFIX_PATTERN <- paste0(TEMP_IND_SUFFIX, "([0-9]+)$")
 
 parseModelArguments <- function(parTable,
                                 data,
@@ -11,23 +12,63 @@ parseModelArguments <- function(parTable,
                                 mcpls = FALSE,
                                 mc.fast.lmer = NULL,
                                 consistent = TRUE,
-                                is.lower.order = FALSE) {
-  data <- as.data.frame(data)
+                                is.lower.order = FALSE,
+                                strict = TRUE) {
+  # make sure we're working with a data.frame
+  data <- asDataFrame(data)
 
   # Check for interation terms
+  checkLhsIntTerms(parTable) # make sure they are all independent
+
   intTermNames <- getIntTerms(parTable)
-  intTermElems <- stringr::str_split(intTermNames, pattern = ":")
-  names(intTermElems)  <- intTermNames
+  intTermElems <- stats::setNames(
+    stringr::str_split(intTermNames, pattern = ":"), nm = intTermNames
+  )
+
   is.nlin <- length(intTermElems) > 0L
+
+  # Check for MIMIC blocks
+  # If we have constructs which have a mix of "<~" and "=~" we redefine
+  # lv=~ov -> ov~lv. We add a suffix such that we can clean it up later
+  mode.c <- intersect(
+    getFormativeLVs(parTable),
+    getReflectiveLVs(parTable)
+  )
+
+  for (lv in mode.c) {
+    # what needs to be redefined?
+    idxs <- which(parTable$lhs == lv & parTable$op == "=~")
+
+    for (idx in idxs) {
+      ov <- parTable[idx, "rhs"]
+      tmp <- paste0(ov, TEMP_MIMIC_SUFFIX)
+
+      if (ov %in% colnames(data))
+        data[[tmp]] <- data[[ov]]
+
+      if (ov %in% ordered)
+        ordered <- c(ordered, tmp)
+
+      # redefine measurement model
+      parTable[idx, "lhs"] <- tmp
+      parTable[idx, "op"]  <- "~"
+      parTable[idx, "rhs"] <- lv
+    }
+  }
 
   # Check for dupliacted indicators
   isind <- parTable$op %in% MOPS
   isstr <- parTable$op == "~"
-  iscov <- parTable$op == "~~"
 
   indicators <- parTable[isind, "rhs"]
-  covvars    <- unique(c(parTable[iscov, "lhs"], parTable[iscov, "rhs"]))
-  structvars <- unique(c(parTable[isstr, "rhs"], covvars))
+
+  # A variable is structural if it is connected by a regression path (`~`) or
+  # explicitly declared as a path-less structural node (e.g. `x ~ 1`). A `~~`
+  # no longer promotes a variable to a structural variable; it only frees a
+  # (co)variance among existing nodes. This means covariances may be specified
+  # within the measurement model without renaming the indicators involved.
+  declvars   <- getDeclaredStructVars(parTable)
+  structvars <- unique(c(parTable[isstr, "rhs"], declvars))
 
   # A duplicated indicator can occur under two circumstances:
   #   1. It's an indicator which is part of two constructs
@@ -92,9 +133,16 @@ parseModelArguments <- function(parTable,
     # Add measurment equation
     parTable <- rbind(
       parTable,
-      data.frame(lhs = ov, op = "<~", rhs = tmp.ov, mod = "")
+      data.frame(lhs = ov, op = "<~", rhs = tmp.ov, mod = "", start = NA)
     )
   }
+
+  # `ADDITIONAL_STRUCT_VAR_OP` (`~1`) rows only *declare* structural nodes; they
+  # are not estimable equations. The structural side (GLS) reads them straight
+  # off the raw parTable, and observed declarations have, by now, been turned
+  # into measurement equations above, so drop them before the PLS measurement
+  # model.
+  parTable <- parTable[parTable$op != ADDITIONAL_STRUCT_VAR_OP, , drop = FALSE]
 
   # Recompile syntax
   syntax <- parTableToSyntax(parTable)
@@ -127,7 +175,8 @@ parseModelArguments <- function(parTable,
 
   has.ord            <- length(ordered) > 0L
   is.mlm             <- length(lme4.syntax) > 0L
-  is.mcpls           <- COALLESCE(mcpls, has.ord && (is.nlin || is.lower.order))
+  use.mcpls.default  <- (has.ord && (is.nlin || is.lower.order)) || is.mlm
+  is.mcpls           <- COALLESCE(mcpls, use.mcpls.default)
   is.probit          <- COALLESCE(probit, has.ord && !is.mcpls)
   mc.fast.lmer       <- COALLESCE(mc.fast.lmer, is.mcpls)
 
@@ -157,4 +206,27 @@ getClusterFromMultilevelStrings <- function(strings) {
     stringr::str_split_fixed(pattern = "\\|", n = 2L)
 
   unique(unlist(stringr::str_split(split[,2L], pattern = "\\+")))
+}
+
+
+parseStartModifiers <- function(mod) {
+  pattern <- "^start\\((.*)\\)$"
+
+  idx   <- which(grepl(pattern, mod))
+  start <- rep(NA_real_, length(mod))
+
+  vals <- stringr::str_extract(mod[idx], pattern = pattern, group = 1L)
+  vals <- suppressWarnings(as.numeric(vals))
+
+  if (anyNA(vals)) {
+    bad <- mod[idx][is.na(vals)]
+
+    pls_msg_warn(
+      "Could not parse start values for some `start()` modifiers!",
+      "Failed to parse:", paste0(bad, collapse = ", ")
+    )
+  }
+
+  start[idx] <- vals
+  start
 }

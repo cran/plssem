@@ -1,7 +1,10 @@
-CI_QUANTILE <- qnorm(0.05)
+CI_QUANTILE <- qnorm(0.975)
 
 
-getParTableEstimates <- function(model, rm.tmp.ov = TRUE, clean.tmp.ind = TRUE) {
+getParTableEstimates <- function(model,
+                                 rm.tmp.ov = TRUE,
+                                 clean.tmp.ind = TRUE,
+                                 clean.tmp.mimic = TRUE) {
   est    <- model@params$values
   se     <- model@params$se
   names  <- names(est)
@@ -10,28 +13,23 @@ getParTableEstimates <- function(model, rm.tmp.ov = TRUE, clean.tmp.ind = TRUE) 
   lhs      <- split$lhs
   op       <- split$op
   rhs      <- split$rhs
-  z        <- est / se
-  pvalue   <- 2 * stats::pnorm(-abs(z))
-  ci.lower <- est - CI_QUANTILE * z
-  ci.upper <- est + CI_QUANTILE * z
 
-  parTable <- data.frame(
+  parTable <- addZStatsParTable(data.frame(
     lhs      = lhs,
     op       = op,
     rhs      = rhs,
     est      = est,
-    se       = se,
-    z        = z,
-    pvalue   = pvalue,
-    ci.lower = ci.lower,
-    ci.upper = ci.upper
-  )
+    se       = se
+  ))
 
   if (rm.tmp.ov)
-    parTable <- removeTempOV_RowsParTable(parTable)
+    parTable <- removeTempOvRowsParTable(parTable)
 
   if (clean.tmp.ind)
-    parTable <- cleanTempInd_RowsParTable(parTable)
+    parTable <- cleanTempIndRowsParTable(parTable)
+
+  if (clean.tmp.mimic)
+    parTable <- cleanTempMimicRowsParTable(parTable)
 
   plssemParTable(parTable)
 }
@@ -44,14 +42,13 @@ parTableToParams <- function(parTable) {
   est <- parTable$est
   se  <- parTable$se
 
-  k          <- NROW(parTable)
-  names      <- paste0(lhs, op, rhs)
-  values     <- stats::setNames(est, nm = names)
+  k      <- NROW(parTable)
+  names  <- paste0(lhs, op, rhs)
+  values <- stats::setNames(est, nm = names)
 
   list(
     names      = names,
     values     = values,
-    values.old = NULL,
     se         = se,
     vcov       = NULL
   )
@@ -81,13 +78,20 @@ splitParameterNames <- function(names) {
 }
 
 
-removeTempOV_RowsParTable <- function(parTable) {
+removeTempOvRowsParTable <- function(parTable, clean.thr = TRUE) {
+
+  if (clean.thr) {
+    is.thr <- parTable$op == "|"
+    parTable$lhs[is.thr] <- removeTempOvPrefix(parTable$lhs[is.thr])
+    parTable$rhs[is.thr] <- removeTempOvPrefix(parTable$rhs[is.thr])
+  }
+
   tmp <- hasTempOvPrefix(parTable$lhs) | hasTempOvPrefix(parTable$rhs)
   parTable[!tmp, , drop = FALSE]
 }
 
 
-cleanTempInd_RowsParTable <- function(parTable) {
+cleanTempIndRowsParTable <- function(parTable) {
   rhs <- unique(parTable$rhs) # Only injected into the rhs column
   tmp <- rhs[hasTempIndSuffix(rhs)]
   cln <- removeTempIndSuffix(tmp)
@@ -99,8 +103,50 @@ cleanTempInd_RowsParTable <- function(parTable) {
     , drop = FALSE
   ]
 
+  # Thresholds are properties of the original observed indicator. Internal
+  # copies of a duplicated indicator must not create duplicate public rows.
+  is.threshold <- parTable$op == "|"
+  is.tmp.threshold <- is.threshold & (
+    hasTempIndSuffix(parTable$lhs) | hasTempIndSuffix(parTable$rhs)
+  )
+  threshold.key <- paste(
+    removeTempIndSuffix(parTable$lhs),
+    parTable$op,
+    removeTempIndSuffix(parTable$rhs),
+    sep = "\r"
+  )
+
+  drop.threshold <- logical(NROW(parTable))
+  for (key in unique(threshold.key[is.tmp.threshold])) {
+    idx <- which(is.threshold & threshold.key == key)
+    keep <- idx[!is.tmp.threshold[idx]]
+    keep <- if (length(keep)) keep[[1L]] else idx[[1L]]
+    drop.threshold[setdiff(idx, keep)] <- TRUE
+  }
+  parTable <- parTable[!drop.threshold, , drop = FALSE]
+
   parTable$rhs <- removeTempIndSuffix(parTable$rhs)
   parTable$lhs <- removeTempIndSuffix(parTable$lhs)
+
+  parTable
+}
+
+
+cleanTempMimicRowsParTable <- function(parTable) {
+  lhs <- parTable$lhs
+  op  <- parTable$op
+  rhs <- parTable$rhs
+
+  idx <- which(hasTempMimicSuffix(lhs) & op == "~")
+
+  # redefine
+  parTable[idx, "lhs"] <- rhs[idx]
+  parTable[idx, "op"]  <- "=~"
+  parTable[idx, "rhs"] <- lhs[idx]
+
+  # clean
+  parTable$lhs <- removeTempMimicSuffix(parTable$lhs)
+  parTable$rhs <- removeTempMimicSuffix(parTable$rhs)
 
   parTable
 }
@@ -130,4 +176,30 @@ addColonPI_ParTable <- function(parTable, model, label.renamed.prod = FALSE) {
   }
 
   parTable
+}
+
+
+addZStatsParTable <- function(parTable) {
+  lhs      <- parTable$lhs
+  op       <- parTable$op
+  rhs      <- parTable$rhs
+  est      <- parTable$est
+  se       <- parTable$se
+
+  z        <- est / se
+  pvalue   <- 2 * stats::pnorm(-abs(z))
+  ci.lower <- est - CI_QUANTILE * se
+  ci.upper <- est + CI_QUANTILE * se
+
+  data.frame(
+    lhs      = lhs,
+    op       = op,
+    rhs      = rhs,
+    est      = est,
+    se       = se,
+    z        = z,
+    pvalue   = pvalue,
+    ci.lower = ci.lower,
+    ci.upper = ci.upper
+  )
 }

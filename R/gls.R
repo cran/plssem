@@ -1,0 +1,266 @@
+GlsPathModel <- function(parTable = NULL, data.cov = NULL) {
+  if (!NROW(parTable))
+    return(methods::new("GlsPathModel"))
+
+  # Structural nodes: every latent variable, every variable connected by a
+  # regression path (`~`), and every variable explicitly declared as a path-less
+  # structural node via `ADDITIONAL_STRUCT_VAR_OP` (e.g. `x ~ 1`). A `~~` does
+  # not introduce a node -- it only frees a covariance between two existing
+  # nodes (see the `cov` block below, which keeps only such rows).
+  etas <- unique(c(
+    parTable[parTable$op %in% c("=~", "<~"), "lhs"],
+    parTable[parTable$op == "~", "lhs"],
+    parTable[parTable$op == "~", "rhs"],
+    getDeclaredStructVars(parTable)
+  ))
+
+  reg  <- parTable[parTable$op == "~", , drop = FALSE]
+  xis  <- setdiff(etas, reg$lhs) # purely exogenous variables
+  k    <- length(etas)
+
+  # covariances
+  cov <- parTable[
+    parTable$lhs %in% etas &
+    parTable$op == "~~" &
+    parTable$rhs %in% etas, , drop = FALSE
+  ]
+
+  gamma <- psi <- matrix(
+    0, nrow = k, ncol = k,
+    dimnames = list(etas, etas)
+  )
+
+  # paths
+  for (i in seq_len(NROW(reg))) {
+    lhs <- reg[i, "lhs"]
+    rhs <- reg[i, "rhs"]
+    gamma[lhs, rhs] <- NA
+  }
+
+  # covariances
+  for (i in seq_len(NROW(cov))) {
+    lhs <- cov[i, "lhs"]
+    rhs <- cov[i, "rhs"]
+    psi[lhs, rhs] <- psi[rhs, lhs] <- NA
+  }
+
+  diag(psi) <- NA
+  psi[xis, xis] <- NA
+  psi[upper.tri(psi)] <- 0
+
+  if (!is.null(data.cov)) {
+    pair <- glsGetSampleInformation(
+      data.cov = data.cov, etas = etas
+    )
+
+    S     <- pair$S
+    S.inv <- pair$S.inv
+
+  } else {
+    S <- psi
+    S[] <- NA
+    S.inv <- S
+
+  }
+
+  # starting values
+  gamma.start <- gamma
+  gamma.start[] <- 0
+
+  psi.start <- psi
+  psi.start[] <- 0
+  diag(psi.start) <- 1
+
+  # parTable
+  pgamma <- gamma
+  pgamma[] <- ""
+  for (i in etas) for (j in etas) {
+    if (!is.na(gamma[i,j])) next
+    pgamma[i, j] <- paste0(i, "~", j)
+  }
+
+  ppsi <- psi
+  ppsi[] <- ""
+  for (i in etas) for (j in etas) {
+    if (!is.na(psi[i,j])) next
+    ppsi[i, j] <- paste0(i, "~~", j)
+  }
+
+  pars <- c(ppsi[is.na(psi)], pgamma[is.na(gamma)])
+  parTable <- as.data.frame(splitParameterNames(pars))
+  parTable$est <- NA_real_
+
+  methods::new("GlsPathModel",
+    matrices = list(
+      psi = psi,
+      gamma = gamma,
+      psi.free = is.na(psi),
+      gamma.free = is.na(gamma),
+      I = diag(k),
+      S = S,
+      S.inv = S.inv
+    ),
+    info = list(
+      start = c(psi.start[is.na(psi)], gamma.start[is.na(gamma)]),
+      npar = sum(is.na(psi)) + sum(is.na(gamma)),
+      idx.psi = seq_len(sum(is.na(psi))),
+      idx.gamma = seq_len(sum(is.na(gamma))) + sum(is.na(psi)),
+      k = k,
+      etas = etas,
+      xis = xis
+    ),
+    parTable = parTable
+  )
+}
+
+
+glsGetSampleInformation <- function(data.cov, etas) {
+  pls_stopif(!is.matrix(data.cov),
+    "`data.cov` must be a matrix!"
+  )
+
+  rm <- setdiff(etas, rownames(data.cov))
+  pls_stopif(length(rm),
+    "Missing rownames in `data.cov`:", paste0(rm, collapse = ", ")
+  )
+
+  cm <- setdiff(etas, colnames(data.cov))
+  pls_stopif(length(cm),
+    "Missing rownames in `data.cov`:", paste0(cm, collapse = ", ")
+  )
+
+  S <- data.cov[etas, etas]
+  S.inv <- glsComputeInvCov(S)
+
+  list(S = S, S.inv = S.inv)
+}
+
+
+`glsModelCovMatrix<-` <- function(model, value) {
+  pair <- glsGetSampleInformation(
+    data.cov = value, etas = model@info$etas
+  )
+
+  model@matrices$S <- pair$S
+  model@matrices$S.inv <- pair$S.inv
+
+  model
+}
+
+
+glsFillModel <- function(model, par) {
+  M <- model@matrices
+  model@parTable$est[] <- par
+
+  psi <- model@matrices$psi
+  gamma <- model@matrices$gamma
+
+  psi[model@matrices$psi.free] <- par[model@info$idx.psi]
+  psi[upper.tri(psi)] <- t(psi)[upper.tri(psi)]
+  gamma[model@matrices$gamma.free] <- par[model@info$idx.gamma]
+
+  model@matrices$psi <- psi
+  model@matrices$gamma <- gamma
+
+  model
+}
+
+
+glsCalcSigmaHat <- function(model) {
+  M     <- model@matrices
+  gamma <- M$gamma
+  psi   <- M$psi
+  I     <- M$I
+
+  binv <- solve(I - gamma)
+  binv %*% psi %*% t(binv)
+}
+
+
+glsObjective <- function(model) {
+  sigma.hat <- glsCalcSigmaHat(model)
+
+  S     <- model@matrices$S
+  S.inv <- model@matrices$S.inv
+
+  tmp <- S.inv %*% (S - sigma.hat)
+
+  # equivalent to: 0.5 * tr(tmp %*% tmp))
+  fx <- 0.5 * sum(tmp * t(tmp))
+
+  if (fx < 0) NaN else fx
+}
+
+
+glsEstimateParameters <- function(model, data.cov = NULL,
+                                  control = list(eval.max = 1500, iter.max = 1000),
+                                  ...) {
+  if (!is.null(data.cov)) # update sample covariance matrix?
+    glsModelCovMatrix(model) <- data.cov
+
+  # objective and gradient
+  fn <- \(x) glsObjective(glsFillModel(model, x))
+  gr <- \(x) glsGradient(glsFillModel(model, x))
+
+  suppressWarnings({
+    opt <- stats::nlminb(
+      start = model@info$start,
+      objective = fn,
+      gradient = gr,
+      control = control,
+      ...
+    )
+  })
+
+  glsFillModel(model, opt$par)
+}
+
+
+glsComputeInvCov <- function(S) {
+  tryCatch(
+    solve(S),
+    error = function(e) {
+      # issue a warning to the user
+      pls_msg_warn(
+        "Construct covariance matrix is not positive-definite!"
+      )
+
+      # try a generalized inverse
+      tryCatch(
+        MASS::ginv(S),
+        error = function(e) {
+          pls_msg_stop(
+            "Could not invert construct covariance matrix!",
+            "Message:", conditionMessage(e)
+          )
+        }
+      )
+    }
+  )
+}
+
+
+glsGradient <- function(model) {
+  # solved using matrixcalculus.org
+  M <- model@matrices
+
+  # matrices
+  gamma  <- M$gamma
+  psi    <- M$psi
+  I      <- M$I
+  S      <- M$S
+  S.inv  <- M$S.inv
+
+  # intermediate expressions
+  B.inv <- solve(I - gamma)
+  eps   <- S - B.inv %*% psi %*% t(B.inv)
+  G     <- S.inv %*% eps %*% t(S.inv)
+  BtGB  <- t(B.inv) %*% G %*% B.inv
+
+  # gamma
+  ggamma <- -2 * BtGB %*% psi %*% t(B.inv)
+  gpsi   <- gradSymMat(-BtGB)
+
+  # free params
+  c(gpsi[M$psi.free], ggamma[M$gamma.free])
+}

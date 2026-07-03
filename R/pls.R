@@ -112,17 +112,43 @@ USE_NON_LINEAR_PROBIT_CORR_MAT <- FALSE
 #' @param mc.fn.args Additional arguments to MC-PLS algorithm, mainly for controlling
 #'   the step size.
 #'
+#' @param mc.rescov How residual covariances are treated in MC-PLS. One of
+#'   \code{"auto"} (the default), \code{"reduced"}, or \code{"full"}. In
+#'   \code{"reduced"} mode residual covariances are not treated as free
+#'   parameters; they are identified from the rest of the structural model and
+#'   the disturbances are simulated independently. In \code{"full"} mode the
+#'   endogenous residual covariances (\code{eta ~~ eta} and \code{xi ~~ eta})
+#'   are free parameters, explicitly simulated. \code{"auto"} uses \code{"full"}
+#'   when the structural model is estimated by GLS (i.e. the model contains
+#'   residual covariances) and \code{"reduced"} otherwise.
+#'
 #' @param verbose Should verbose output be printed?
 #'
 #' @param boot.optimize Logical; if \code{TRUE} and \code{bootstrap = TRUE}, applies
 #'   the settings in \code{mc.boot.control} inside each bootstrap replicate (MC-PLS only).
 #'   In general it will lead to slightly larger and less accurate standard errors.
 #'
+#' @param boot.drop.inadmissible Logical; if \code{TRUE} and \code{bootstrap = TRUE},
+#'   bootstrap replicates that yield an inadmissible solution (e.g. a Heywood case)
+#'   are discarded before computing standard errors, just like replicates where the
+#'   estimation procedure fails outright. Defaults to \code{FALSE}, which keeps
+#'   inadmissible replicates. In either case the number of inadmissible replicates
+#'   is reported. Note that dropping inadmissible solutions conditions the bootstrap
+#'   distribution on well-behaved resamples and may bias the standard errors downward.
+#'
 #' @param mc.boot.control List of control parameters passed to the MC-PLS algorithm
 #'   inside each bootstrap replicate when \code{boot.optimize = TRUE}.
 #'
 #' @param reliabilities Optional named numeric vector of user-supplied reliabilities
 #'   used for the PLSc consistency correction.
+#'
+#' @param default.path.estimator Character string selecting the estimator used for
+#'   the structural (path) model when the model does not require Generalized Least
+#'   Squares (GLS). The default \code{"ols"} uses Ordinary Least Squares whenever
+#'   possible, falling back to GLS automatically when the model contains residual
+#'   covariances. Setting \code{default.path.estimator = "gls"}
+#'   forces GLS estimation of the structural model even when OLS would otherwise be
+#'   used.
 #'
 #' @param ... Internal arguments. For advanced users only.
 #'
@@ -168,11 +194,11 @@ pls <- function(syntax,
                 boot.ncores = 1L,
                 boot.ncpus = NULL,
                 boot.parallel = c("no", "multicore", "multisession", "snow"),
-                boot.R = 50L,
+                boot.R = 500L,
                 boot.iseed = NULL,
                 sample = NULL,
                 mc.min.iter = 50L,
-                mc.max.iter = 500L,
+                mc.max.iter = 1000L,
                 mc.reps = 20000L,
                 mc.fixed.seed = FALSE,
                 mc.polyak.juditsky = TRUE,
@@ -181,8 +207,10 @@ pls <- function(syntax,
                 mc.delta.se = TRUE,
                 mc.delta.jacobian.k = max(floor(boot.R / 100L), 1),
                 mc.fn.args = list(),
+                mc.rescov = c("auto", "reduced", "full"),
                 verbose = interactive(),
                 boot.optimize = TRUE,
+                boot.drop.inadmissible = FALSE,
                 mc.boot.control = list(
                   min.iter        = mc.min.iter,
                   max.iter        = mc.max.iter,
@@ -195,10 +223,12 @@ pls <- function(syntax,
                   reuse.p.start   = TRUE
                 ),
                 reliabilities = NULL,
+                default.path.estimator = c("ols", "gls"),
                 ...) {
 
   missing       <- match.arg(tolower(missing), c("listwise", "mean", "knn"))
   boot.parallel <- match.arg(tolower(boot.parallel), c("no", "multicore", "multisession", "snow"))
+  default.path.estimator <- match.arg(tolower(default.path.estimator), c("ols", "gls"))
 
   if (!is.null(boot.ncpus)) {
     pls_msg_warn("The `boot.ncpus` argument is deprecated; please use `boot.ncores` instead.")
@@ -210,40 +240,43 @@ pls <- function(syntax,
     boot.R <- sample
   }
 
-  data <- as.data.frame(data)
+  data <- asDataFrame(data)
 
   model <- specifyModel(
-    syntax              = syntax,
-    data                = data,
-    consistent          = consistent,
-    missing             = missing,
-    standardize         = standardize,
-    ordered             = ordered,
-    probit              = probit,
-    mcpls               = mcpls,
-    mc.fast.lmer        = mc.fast.lmer,
-    tolerance           = tolerance,
-    max.iter.0_5        = max.iter.0_5,
-    mc.min.iter         = mc.min.iter,
-    mc.max.iter         = mc.max.iter,
-    mc.reps             = mc.reps,
-    mc.tol              = mc.tol,
-    mc.fixed.seed       = mc.fixed.seed,
-    mc.polyak.juditsky  = mc.polyak.juditsky,
-    mc.pj.extrapolate   = mc.pj.extrapolate,
-    mc.delta.se         = mc.delta.se,
-    mc.delta.jacobian.k = mc.delta.jacobian.k,
-    mc.fn.args          = mc.fn.args,
-    verbose             = verbose,
-    bootstrap           = bootstrap,
-    boot.ncores         = boot.ncores,
-    boot.parallel       = boot.parallel,
-    boot.R              = boot.R,
-    boot.iseed          = boot.iseed,
-    boot.optimize       = boot.optimize,
-    mc.boot.control     = mc.boot.control,
-    knn.k               = knn.k,
-    reliabilities       = reliabilities,
+    syntax                 = syntax,
+    data                   = data,
+    consistent             = consistent,
+    missing                = missing,
+    standardize            = standardize,
+    ordered                = ordered,
+    probit                 = probit,
+    mcpls                  = mcpls,
+    mc.fast.lmer           = mc.fast.lmer,
+    tolerance              = tolerance,
+    max.iter.0_5           = max.iter.0_5,
+    mc.min.iter            = mc.min.iter,
+    mc.max.iter            = mc.max.iter,
+    mc.reps                = mc.reps,
+    mc.tol                 = mc.tol,
+    mc.fixed.seed          = mc.fixed.seed,
+    mc.polyak.juditsky     = mc.polyak.juditsky,
+    mc.pj.extrapolate      = mc.pj.extrapolate,
+    mc.delta.se            = mc.delta.se,
+    mc.delta.jacobian.k    = mc.delta.jacobian.k,
+    mc.fn.args             = mc.fn.args,
+    mc.rescov              = match.arg(mc.rescov, c("auto", "reduced", "full")),
+    verbose                = verbose,
+    bootstrap              = bootstrap,
+    boot.ncores            = boot.ncores,
+    boot.parallel          = boot.parallel,
+    boot.R                 = boot.R,
+    boot.iseed             = boot.iseed,
+    boot.optimize          = boot.optimize,
+    boot.drop.inadmissible = boot.drop.inadmissible,
+    mc.boot.control        = mc.boot.control,
+    knn.k                  = knn.k,
+    reliabilities          = reliabilities,
+    default.path.estimator = default.path.estimator,
     ...
   )
 
@@ -285,7 +318,7 @@ estimatePLS_InnerLocal <- function(model) {
     updateOuterWeights() |>
     updateFactorScores() |>
     updateFitObjects()   |>
-    updateParamVector()  |>
+    updateParamVector() |>
     updateEstimationStatus()
 }
 

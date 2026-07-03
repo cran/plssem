@@ -15,10 +15,8 @@ resetModelStatusLowerOrder <- function(model, hard.reset = FALSE) {
   model@status$convergence <- FALSE
   model@status$iterations.0_5 <- 0L
 
-  if (hard.reset) {
+  if (hard.reset)
     model@status$iterations <- 0L
-    model@params$values.old <- NULL
-  }
 
   model
 }
@@ -45,12 +43,14 @@ initModelParams <- function(model) {
   k <- length(parnames)
 
   model@params <- list(
-    names      = parnames,
-    values     = rep(NA_real_, k),
-    values.old = NULL,
-    se         = rep(NA_real_, k),
-    vcov       = NULL,
-    Jacobian   = NULL
+    names          = parnames,
+    values         = rep(NA_real_, k),
+    se             = rep(NA_real_, k),
+    vcov           = NULL,
+    Jacobian0      = NULL, # free mc params to free naive params
+    Jacobian1      = NULL, # free mc params to all mc params
+    JacobianProbs0 = NULL, # empirical probabilities to free MC root equation
+    JacobianProbs1 = NULL  # empirical probabilities to all MC params
   )
 
   model
@@ -66,7 +66,8 @@ initModelMcArgs <- function(min.iter,
                             pj.extrapolate,
                             delta.se,
                             delta.jacobian.k,
-                            fn.args) {
+                            fn.args,
+                            rescov = "reduced") {
   list(
     min.iter         = min.iter,
     max.iter         = max.iter,
@@ -78,6 +79,7 @@ initModelMcArgs <- function(min.iter,
     delta.se         = delta.se,
     delta.jacobian.k = delta.jacobian.k,
     fn.args          = fn.args,
+    rescov           = rescov,
     rng.seed         = NULL,
     p.start          = NULL
   )
@@ -90,15 +92,17 @@ initModelBootInfo <- function(bootstrap,
                               R,
                               iseed,
                               optimize,
+                              drop.inadmissible,
                               mc.boot.control) {
   list(
-    bootstrap       = bootstrap,
-    ncores          = ncores,
-    parallel        = parallel,
-    R               = R,
-    iseed           = iseed,
-    optimize        = optimize,
-    mc.boot.control = mc.boot.control
+    bootstrap         = bootstrap,
+    ncores            = ncores,
+    parallel          = parallel,
+    R                 = R,
+    iseed             = iseed,
+    optimize          = optimize,
+    drop.inadmissible = drop.inadmissible,
+    mc.boot.control   = mc.boot.control
   )
 }
 
@@ -113,7 +117,8 @@ initModelInfo <- function(baseInfo,
                           reliabilities,
                           is.lower.order,
                           mc.args,
-                          boot) {
+                          boot,
+                          scale) {
   stopifnot(is.list(baseInfo), is.list(parsed))
 
   info <- baseInfo
@@ -147,6 +152,7 @@ initModelInfo <- function(baseInfo,
   info$is.lower.order <- isTRUE(is.lower.order)
   info$mc.args        <- mc.args
   info$boot           <- boot
+  info$scale          <- scale
 
   info
 }

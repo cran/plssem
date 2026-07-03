@@ -4,7 +4,8 @@ bootstrap <- function(model,
                       parallel = model@info$boot$parallel,
                       ncores   = model@info$boot$ncores,
                       R        = model@info$boot$R,
-                      iseed    = model@info$boot$iseed) {
+                      iseed    = model@info$boot$iseed,
+                      drop.inadmissible = isTRUE(model@info$boot$drop.inadmissible)) {
 
   if (is.null(parallel)) parallel <- "no"
   parallel <- match.arg(parallel, c("no", "multicore", "multisession", "snow"))
@@ -38,6 +39,10 @@ bootstrap <- function(model,
     isMCPLS(baseModel, recursive = TRUE) <- FALSE
   }
 
+  # The base fit may itself be inadmissible. Reset the admissibility status on
+  # the template such that the bootstraps don't inherit the inadmissibility flag
+  isAdmissible(baseModel, recursive = TRUE) <- TRUE
+
   boot.optimize <- isTRUE(model@info$boot$optimize)
   mc.boot.control <- prepMCBootControl(
     boot.control  = model@info$boot$mc.boot.control,
@@ -46,8 +51,8 @@ bootstrap <- function(model,
   )
 
   combinedCoefs <- combinedModel(model)@params$values
-  # parTemplate might be stale with mc.delta=TRUE...
-  
+
+  probsTemplate <- model@thresholdStruct@proportions
   parTemplate <- stats::setNames(
     rep(NA_real_, length(combinedCoefs)),
     names(combinedCoefs)
@@ -77,7 +82,11 @@ bootstrap <- function(model,
       model.b@data       <- sampleData
       model.b@matrices$S <- sampleS
 
-      mc.args             <- model.b@info$mc.args
+      model.b@thresholdStruct <- updateThresholds(updateProportions(
+        thr  = baseModel@thresholdStruct,
+        data = sampleData
+      ))
+
       boot.fixed.seed     <- mc.boot.control$fixed.seed
       boot.polyak         <- mc.boot.control$polyak.juditsky
       boot.pj.extrapolate <- mc.boot.control$pj.extrapolate
@@ -103,26 +112,37 @@ bootstrap <- function(model,
 
       })
 
-      par <- formatBootPars(
-        modelParams(combinedModel(model.b))$values
-      )
+      par <- formatBootPars(modelParams(combinedModel(model.b))$values)
+      probs <- model.b@thresholdStruct@proportions
 
       if (low.tol.penalty > 0 && is.mcpls && !mc.delta.se) {
         k <- length(par)
         par <- par + stats::rnorm(k, mean = 0, sd = low.tol.penalty)
       }
 
-      attr(par, "id") <- i
-      par
+      inadmissible <- !isAdmissible(model.b)
+
+      if (inadmissible && drop.inadmissible) {
+        # drop the replicate by treating it like a failed fit; the all-NA row
+        # is excluded from the (co-)variances via `use = "complete.obs"` below
+        out <- c(parTemplate, probsTemplate + NA_real_)
+      } else {
+        out <- c(par, probs)
+      }
+
+      attr(out, "id") <- i
+      attr(out, "inadmissible") <- inadmissible
+      out
 
     }, error = \(e) {
       pls_msg_warn(
         paste0("Bootstrap replicate ", i, " failed: ", conditionMessage(e))
       )
 
-      par <- parTemplate
-      attr(par, "id") <- i
-      par
+      out <- c(parTemplate, probsTemplate + NA_real_)
+      attr(out, "id") <- i
+      attr(out, "inadmissible") <- NA # errored before admissibility is known
+      out
     })
   }
 
@@ -240,37 +260,97 @@ bootstrap <- function(model,
 
   ids <- vapply(results, FUN.VALUE = integer(1L), FUN = \(x) attr(x, "id"))
 
+  inadmissible <- vapply(
+    results, FUN.VALUE = logical(1L),
+    FUN = \(x) isTRUE(attr(x, "inadmissible"))
+  )
+  n.inadmissible <- sum(inadmissible)
+
+  if (n.inadmissible) {
+    verb <- if (drop.inadmissible) "Dropped" else "Kept"
+    pls_msg_warn(sprintf(
+      "%s %d (out of %d) bootstrap replicate(s) with inadmissible solutions.",
+      verb, n.inadmissible, R
+    ))
+  }
+
+  pls_warnif(drop.inadmissible && (R - n.inadmissible) < 2L,
+    "Fewer than 2 admissible bootstrap replicates remain after dropping",
+    "inadmissible solutions; standard errors cannot be estimated reliably."
+  )
+
   resultsMat <- do.call(rbind, results)
   rownames(resultsMat) <- ids
-  colnames(resultsMat) <- names(combinedModel(model)@params$values)
+  colnames(resultsMat) <- c(names(combinedModel(model)@params$values), names(probsTemplate))
 
-  vcov <- stats::cov(resultsMat, use = "complete.obs")
+  vcov.joint <- stats::cov(resultsMat, use = "complete.obs")
+  par.names <- names(combinedModel(model)@params$values)
+  vcov <- vcov.joint[par.names, par.names, drop = FALSE]
 
   if (mc.delta.se) {
     combined <- combinedModel(model)
     params <- modelParams(combined)
 
-    if (!is.null(params$Jacobian)) {
-      Jacobian <- params$Jacobian
-      pars <- intersect(colnames(Jacobian), colnames(vcov))
+    if (!is.null(params$Jacobian0)) {
+      Jacobian0 <- params$Jacobian0
+      pars.free <- intersect(colnames(Jacobian0), colnames(vcov.joint))
 
-      vcov.sub <- vcov[pars, pars, drop = FALSE]
-      J <- Jacobian[pars, pars, drop = FALSE]
+      J0 <- Jacobian0[pars.free, pars.free, drop = FALSE]
 
       tryCatch({
-        # Try to invert J
-        J.inv <- tryCatch(
-          solve(J),
-          error = function(e) {
-            pls_msg_warn("Jacobian is not positive definite!")
-            MASS::ginv(J)
-          }
-        )
+        J0.inv <- invertMcJacobian(J0)
 
-        vcov.mc <- J.inv %*% vcov.sub %*% t(J.inv)
-        
-        vcov[] <- 0
-        vcov[pars, pars] <- vcov.mc[pars, pars]
+        if (!is.null(params$Jacobian1)) {
+          Jacobian1 <- params$Jacobian1
+
+          pars.all <- intersect(rownames(Jacobian1), colnames(vcov))
+          missing0 <- setdiff(colnames(vcov), rownames(Jacobian1))
+          missing1 <- setdiff(pars.free, colnames(Jacobian1))
+
+          pls_warnif(length(missing0),
+            "Missing entries in Jacobian for some parameters:",
+            paste0(missing0, collapse = ", ")
+          )
+
+          pls_stopif(length(missing1), # this really shouldn't happen!
+            "Missing entries in Jacobian for some free parameters:",
+            paste0(missing1, collapse = ", ")
+          )
+
+          J1 <- Jacobian1[pars.all, pars.free, drop = FALSE]
+          D.par <- J1 %*% J0.inv
+          prob.names <- intersect(names(probsTemplate), colnames(vcov.joint))
+
+          if (length(prob.names)) {
+            # Implicit delta method:
+            # dp = J0^-1 da - J0^-1 Jp dc
+            # dy = J1 dp + Gp dc
+            Jp <- params$JacobianProbs0[pars.free, prob.names, drop = FALSE]
+            Gp <- params$JacobianProbs1[pars.all, prob.names, drop = FALSE]
+            D.probs <- Gp - D.par %*% Jp
+            D <- cbind(D.par, D.probs)
+            vcov.sub <- vcov.joint[
+              c(pars.free, prob.names), c(pars.free, prob.names), drop = FALSE
+            ]
+
+          } else {
+            D <- D.par
+            vcov.sub <- vcov.joint[pars.free, pars.free, drop = FALSE]
+          }
+
+          vcov.mc.full <- D %*% vcov.sub %*% t(D)
+
+          vcov[] <- 0
+          vcov[pars.all, pars.all] <- vcov.mc.full[pars.all, pars.all]
+
+        } else {
+          # Just use standard errors for free parameters
+          vcov.sub <- vcov.joint[pars.free, pars.free, drop = FALSE]
+          vcov.mc.free <- J0.inv %*% vcov.sub %*% t(J0.inv)
+          vcov[] <- 0
+          vcov[pars.free, pars.free] <- vcov.mc.free[pars.free, pars.free]
+
+        }
 
       }, error = function(e) {
         pls_msg_warn(
@@ -281,13 +361,65 @@ bootstrap <- function(model,
 
         vcov[] <<- NA_real_
       })
+
+      # The (co-)variances structure of the interaction terms, is often
+      # not a function of the free model parameters (though some are).
+      # E.g., the variance of a quadratic terms should analytically always be 2,
+      # and X~X:Z should always be zero. The delta-method should therefore not
+      # add any information here. However, it might seem like it, due to sampling error.
+      # Here we just remove these from the vcov
+      pars   <- rownames(vcov)
+      is.cov <- grepl("~~", pars)
+      is.int <- grepl(":", pars)
+
+      split  <- stringr::str_split_fixed(
+        pars[is.cov & is.int], pattern = "~~", n = 2
+      )
+
+      if (NROW(split)) {
+        split.sub <- split[
+          !grepl("~", split[,1L]) & !grepl("~", split[,2L]) & # remove random effect variances
+          !is.na(split[,1L])      & !is.na(split[,2L]), , drop = FALSE
+        ]
+
+        if (NROW(split.sub)) {
+          rm <- paste0(split.sub[,1L], "~~", split.sub[,2L])
+          vcov[rm,] <- 0
+          vcov[,rm] <- 0
+        }
+      }
+
     }
   }
 
   se <- sqrt(diag(vcov))
   se[se <= zero.tol] <- NA_real_
 
-  list(se = se, boot = resultsMat, vcov = vcov)
+  list(se = se, boot = resultsMat[, par.names, drop = FALSE], vcov = vcov)
+}
+
+
+invertMcJacobian <- function(J, rcond.tol = 1e-10) {
+  condition <- tryCatch(rcond(J), error = function(e) 0)
+
+  if (!is.finite(condition) || condition < rcond.tol) {
+    pls_msg_warn(
+      "MC-PLS root-equation Jacobian is ill-conditioned; ",
+      "using a generalized inverse for delta-method standard errors."
+    )
+    return(MASS::ginv(J))
+  }
+
+  tryCatch(
+    solve(J),
+    error = function(e) {
+      pls_msg_warn(
+        "Unable to invert the MC-PLS root-equation Jacobian; ",
+        "using a generalized inverse for delta-method standard errors."
+      )
+      MASS::ginv(J)
+    }
+  )
 }
 
 

@@ -14,41 +14,28 @@
 
 <title>Monte-Carlo Consistent Partial Least Squares</title>
 
-<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
-// be compatible with the behavior of Pandoc < 2.8).
-document.addEventListener('DOMContentLoaded', function(e) {
-  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
-  var i, h, a;
-  for (i = 0; i < hs.length; i++) {
-    h = hs[i];
-    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
-    a = h.attributes;
-    while (a.length > 0) h.removeAttribute(a[0].name);
+<script src="data:application/javascript;base64,Ly8gUGFuZG9jIDIuOSBhZGRzIGF0dHJpYnV0ZXMgb24gYm90aCBoZWFkZXIgYW5kIGRpdi4gV2UgcmVtb3ZlIHRoZSBmb3JtZXIgKHRvCi8vIGJlIGNvbXBhdGlibGUgd2l0aCB0aGUgYmVoYXZpb3Igb2YgUGFuZG9jIDwgMi44KS4KZG9jdW1lbnQuYWRkRXZlbnRMaXN0ZW5lcignRE9NQ29udGVudExvYWRlZCcsIGZ1bmN0aW9uKGUpIHsKICB2YXIgaHMgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yQWxsKCJkaXYuc2VjdGlvbltjbGFzcyo9J2xldmVsJ10gPiA6Zmlyc3QtY2hpbGQiKTsKICB2YXIgaSwgaCwgYTsKICBmb3IgKGkgPSAwOyBpIDwgaHMubGVuZ3RoOyBpKyspIHsKICAgIGggPSBoc1tpXTsKICAgIGlmICghL15oWzEtNl0kL2kudGVzdChoLnRhZ05hbWUpKSBjb250aW51ZTsgIC8vIGl0IHNob3VsZCBiZSBhIGhlYWRlciBoMS1oNgogICAgYSA9IGguYXR0cmlidXRlczsKICAgIHdoaWxlIChhLmxlbmd0aCA+IDApIGgucmVtb3ZlQXR0cmlidXRlKGFbMF0ubmFtZSk7CiAgfQp9KTsK"></script>
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+
+
+<style type="text/css">
+  code {
+    white-space: pre;
   }
-});
-</script>
-
-<style type="text/css">
-code{white-space: pre-wrap;}
-span.smallcaps{font-variant: small-caps;}
-span.underline{text-decoration: underline;}
-div.column{display: inline-block; vertical-align: top; width: 50%;}
-div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
-ul.task-list{list-style: none;}
-</style>
-
-
-
-<style type="text/css">
-code {
-white-space: pre;
-}
-.sourceCode {
-overflow: visible;
-}
+  .sourceCode {
+    overflow: visible;
+  }
 </style>
 <style type="text/css" data-origin="pandoc">
-html { -webkit-text-size-adjust: 100%; }
 pre > code.sourceCode { white-space: pre; position: relative; }
 pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
@@ -64,54 +51,55 @@ pre > code.sourceCode { white-space: pre-wrap; }
 pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
 }
 pre.numberSource code
-{ counter-reset: source-line 0; }
+  { counter-reset: source-line 0; }
 pre.numberSource code > span
-{ position: relative; left: -4em; counter-increment: source-line; }
+  { position: relative; left: -4em; counter-increment: source-line; }
 pre.numberSource code > span > a:first-child::before
-{ content: counter(source-line);
-position: relative; left: -1em; text-align: right; vertical-align: baseline;
-border: none; display: inline-block;
--webkit-touch-callout: none; -webkit-user-select: none;
--khtml-user-select: none; -moz-user-select: none;
--ms-user-select: none; user-select: none;
-padding: 0 4px; width: 4em;
-color: #aaaaaa;
-}
-pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
 div.sourceCode
-{ }
+  {   }
 @media screen {
 pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
 }
-code span.al { color: #ff0000; font-weight: bold; } 
-code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
-code span.at { color: #7d9029; } 
-code span.bn { color: #40a070; } 
-code span.bu { color: #008000; } 
-code span.cf { color: #007020; font-weight: bold; } 
-code span.ch { color: #4070a0; } 
-code span.cn { color: #880000; } 
-code span.co { color: #60a0b0; font-style: italic; } 
-code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
-code span.do { color: #ba2121; font-style: italic; } 
-code span.dt { color: #902000; } 
-code span.dv { color: #40a070; } 
-code span.er { color: #ff0000; font-weight: bold; } 
-code span.ex { } 
-code span.fl { color: #40a070; } 
-code span.fu { color: #06287e; } 
-code span.im { color: #008000; font-weight: bold; } 
-code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
-code span.kw { color: #007020; font-weight: bold; } 
-code span.op { color: #666666; } 
-code span.ot { color: #007020; } 
-code span.pp { color: #bc7a00; } 
-code span.sc { color: #4070a0; } 
-code span.ss { color: #bb6688; } 
-code span.st { color: #4070a0; } 
-code span.va { color: #19177c; } 
-code span.vs { color: #4070a0; } 
-code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+
 </style>
 <script>
 // apply pandoc div.sourceCode style to pre.sourceCode instead
@@ -145,187 +133,7 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; }
 
 
 
-<style type="text/css">body {
-background-color: #fff;
-margin: 1em auto;
-max-width: 700px;
-overflow: visible;
-padding-left: 2em;
-padding-right: 2em;
-font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
-font-size: 14px;
-line-height: 1.35;
-}
-#TOC {
-clear: both;
-margin: 0 0 10px 10px;
-padding: 4px;
-width: 400px;
-border: 1px solid #CCCCCC;
-border-radius: 5px;
-background-color: #f6f6f6;
-font-size: 13px;
-line-height: 1.3;
-}
-#TOC .toctitle {
-font-weight: bold;
-font-size: 15px;
-margin-left: 5px;
-}
-#TOC ul {
-padding-left: 40px;
-margin-left: -1.5em;
-margin-top: 5px;
-margin-bottom: 5px;
-}
-#TOC ul ul {
-margin-left: -2em;
-}
-#TOC li {
-line-height: 16px;
-}
-table {
-margin: 1em auto;
-border-width: 1px;
-border-color: #DDDDDD;
-border-style: outset;
-border-collapse: collapse;
-}
-table th {
-border-width: 2px;
-padding: 5px;
-border-style: inset;
-}
-table td {
-border-width: 1px;
-border-style: inset;
-line-height: 18px;
-padding: 5px 5px;
-}
-table, table th, table td {
-border-left-style: none;
-border-right-style: none;
-}
-table thead, table tr.even {
-background-color: #f7f7f7;
-}
-p {
-margin: 0.5em 0;
-}
-blockquote {
-background-color: #f6f6f6;
-padding: 0.25em 0.75em;
-}
-hr {
-border-style: solid;
-border: none;
-border-top: 1px solid #777;
-margin: 28px 0;
-}
-dl {
-margin-left: 0;
-}
-dl dd {
-margin-bottom: 13px;
-margin-left: 13px;
-}
-dl dt {
-font-weight: bold;
-}
-ul {
-margin-top: 0;
-}
-ul li {
-list-style: circle outside;
-}
-ul ul {
-margin-bottom: 0;
-}
-pre, code {
-background-color: #f7f7f7;
-border-radius: 3px;
-color: #333;
-white-space: pre-wrap; 
-}
-pre {
-border-radius: 3px;
-margin: 5px 0px 10px 0px;
-padding: 10px;
-}
-pre:not([class]) {
-background-color: #f7f7f7;
-}
-code {
-font-family: Consolas, Monaco, 'Courier New', monospace;
-font-size: 85%;
-}
-p > code, li > code {
-padding: 2px 0px;
-}
-div.figure {
-text-align: center;
-}
-img {
-background-color: #FFFFFF;
-padding: 2px;
-border: 1px solid #DDDDDD;
-border-radius: 3px;
-border: 1px solid #CCCCCC;
-margin: 0 5px;
-}
-h1 {
-margin-top: 0;
-font-size: 35px;
-line-height: 40px;
-}
-h2 {
-border-bottom: 4px solid #f7f7f7;
-padding-top: 10px;
-padding-bottom: 2px;
-font-size: 145%;
-}
-h3 {
-border-bottom: 2px solid #f7f7f7;
-padding-top: 10px;
-font-size: 120%;
-}
-h4 {
-border-bottom: 1px solid #f7f7f7;
-margin-left: 8px;
-font-size: 105%;
-}
-h5, h6 {
-border-bottom: 1px solid #ccc;
-font-size: 105%;
-}
-a {
-color: #0033dd;
-text-decoration: none;
-}
-a:hover {
-color: #6666ff; }
-a:visited {
-color: #800080; }
-a:visited:hover {
-color: #BB00BB; }
-a[href^="http:"] {
-text-decoration: underline; }
-a[href^="https:"] {
-text-decoration: underline; }
-
-code > span.kw { color: #555; font-weight: bold; } 
-code > span.dt { color: #902000; } 
-code > span.dv { color: #40a070; } 
-code > span.bn { color: #d14; } 
-code > span.fl { color: #d14; } 
-code > span.ch { color: #d14; } 
-code > span.st { color: #d14; } 
-code > span.co { color: #888888; font-style: italic; } 
-code > span.ot { color: #007020; } 
-code > span.al { color: #ff0000; font-weight: bold; } 
-code > span.fu { color: #900; font-weight: bold; } 
-code > span.er { color: #a61717; background-color: #e3d2d2; } 
-</style>
+<link rel="stylesheet" href="data:text/css,body%20%7B%0Abackground%2Dcolor%3A%20%23fff%3B%0Amargin%3A%201em%20auto%3B%0Amax%2Dwidth%3A%20700px%3B%0Aoverflow%3A%20visible%3B%0Apadding%2Dleft%3A%202em%3B%0Apadding%2Dright%3A%202em%3B%0Afont%2Dfamily%3A%20%22Open%20Sans%22%2C%20%22Helvetica%20Neue%22%2C%20Helvetica%2C%20Arial%2C%20sans%2Dserif%3B%0Afont%2Dsize%3A%2014px%3B%0Aline%2Dheight%3A%201%2E35%3B%0A%7D%0A%23TOC%20%7B%0Aclear%3A%20both%3B%0Amargin%3A%200%200%2010px%2010px%3B%0Apadding%3A%204px%3B%0Awidth%3A%20400px%3B%0Aborder%3A%201px%20solid%20%23CCCCCC%3B%0Aborder%2Dradius%3A%205px%3B%0Abackground%2Dcolor%3A%20%23f6f6f6%3B%0Afont%2Dsize%3A%2013px%3B%0Aline%2Dheight%3A%201%2E3%3B%0A%7D%0A%23TOC%20%2Etoctitle%20%7B%0Afont%2Dweight%3A%20bold%3B%0Afont%2Dsize%3A%2015px%3B%0Amargin%2Dleft%3A%205px%3B%0A%7D%0A%23TOC%20ul%20%7B%0Apadding%2Dleft%3A%2040px%3B%0Amargin%2Dleft%3A%20%2D1%2E5em%3B%0Amargin%2Dtop%3A%205px%3B%0Amargin%2Dbottom%3A%205px%3B%0A%7D%0A%23TOC%20ul%20ul%20%7B%0Amargin%2Dleft%3A%20%2D2em%3B%0A%7D%0A%23TOC%20li%20%7B%0Aline%2Dheight%3A%2016px%3B%0A%7D%0Atable%20%7B%0Amargin%3A%201em%20auto%3B%0Aborder%2Dwidth%3A%201px%3B%0Aborder%2Dcolor%3A%20%23DDDDDD%3B%0Aborder%2Dstyle%3A%20outset%3B%0Aborder%2Dcollapse%3A%20collapse%3B%0A%7D%0Atable%20th%20%7B%0Aborder%2Dwidth%3A%202px%3B%0Apadding%3A%205px%3B%0Aborder%2Dstyle%3A%20inset%3B%0A%7D%0Atable%20td%20%7B%0Aborder%2Dwidth%3A%201px%3B%0Aborder%2Dstyle%3A%20inset%3B%0Aline%2Dheight%3A%2018px%3B%0Apadding%3A%205px%205px%3B%0A%7D%0Atable%2C%20table%20th%2C%20table%20td%20%7B%0Aborder%2Dleft%2Dstyle%3A%20none%3B%0Aborder%2Dright%2Dstyle%3A%20none%3B%0A%7D%0Atable%20thead%2C%20table%20tr%2Eeven%20%7B%0Abackground%2Dcolor%3A%20%23f7f7f7%3B%0A%7D%0Ap%20%7B%0Amargin%3A%200%2E5em%200%3B%0A%7D%0Ablockquote%20%7B%0Abackground%2Dcolor%3A%20%23f6f6f6%3B%0Apadding%3A%200%2E25em%200%2E75em%3B%0A%7D%0Ahr%20%7B%0Aborder%2Dstyle%3A%20solid%3B%0Aborder%3A%20none%3B%0Aborder%2Dtop%3A%201px%20solid%20%23777%3B%0Amargin%3A%2028px%200%3B%0A%7D%0Adl%20%7B%0Amargin%2Dleft%3A%200%3B%0A%7D%0Adl%20dd%20%7B%0Amargin%2Dbottom%3A%2013px%3B%0Amargin%2Dleft%3A%2013px%3B%0A%7D%0Adl%20dt%20%7B%0Afont%2Dweight%3A%20bold%3B%0A%7D%0Aul%20%7B%0Amargin%2Dtop%3A%200%3B%0A%7D%0Aul%20li%20%7B%0Alist%2Dstyle%3A%20circle%20outside%3B%0A%7D%0Aul%20ul%20%7B%0Amargin%2Dbottom%3A%200%3B%0A%7D%0Apre%2C%20code%20%7B%0Abackground%2Dcolor%3A%20%23f7f7f7%3B%0Aborder%2Dradius%3A%203px%3B%0Acolor%3A%20%23333%3B%0Awhite%2Dspace%3A%20pre%2Dwrap%3B%20%0A%7D%0Apre%20%7B%0Aborder%2Dradius%3A%203px%3B%0Amargin%3A%205px%200px%2010px%200px%3B%0Apadding%3A%2010px%3B%0A%7D%0Apre%3Anot%28%5Bclass%5D%29%20%7B%0Abackground%2Dcolor%3A%20%23f7f7f7%3B%0A%7D%0Acode%20%7B%0Afont%2Dfamily%3A%20Consolas%2C%20Monaco%2C%20%27Courier%20New%27%2C%20monospace%3B%0Afont%2Dsize%3A%2085%25%3B%0A%7D%0Ap%20%3E%20code%2C%20li%20%3E%20code%20%7B%0Apadding%3A%202px%200px%3B%0A%7D%0Adiv%2Efigure%20%7B%0Atext%2Dalign%3A%20center%3B%0A%7D%0Aimg%20%7B%0Abackground%2Dcolor%3A%20%23FFFFFF%3B%0Apadding%3A%202px%3B%0Aborder%3A%201px%20solid%20%23DDDDDD%3B%0Aborder%2Dradius%3A%203px%3B%0Aborder%3A%201px%20solid%20%23CCCCCC%3B%0Amargin%3A%200%205px%3B%0A%7D%0Ah1%20%7B%0Amargin%2Dtop%3A%200%3B%0Afont%2Dsize%3A%2035px%3B%0Aline%2Dheight%3A%2040px%3B%0A%7D%0Ah2%20%7B%0Aborder%2Dbottom%3A%204px%20solid%20%23f7f7f7%3B%0Apadding%2Dtop%3A%2010px%3B%0Apadding%2Dbottom%3A%202px%3B%0Afont%2Dsize%3A%20145%25%3B%0A%7D%0Ah3%20%7B%0Aborder%2Dbottom%3A%202px%20solid%20%23f7f7f7%3B%0Apadding%2Dtop%3A%2010px%3B%0Afont%2Dsize%3A%20120%25%3B%0A%7D%0Ah4%20%7B%0Aborder%2Dbottom%3A%201px%20solid%20%23f7f7f7%3B%0Amargin%2Dleft%3A%208px%3B%0Afont%2Dsize%3A%20105%25%3B%0A%7D%0Ah5%2C%20h6%20%7B%0Aborder%2Dbottom%3A%201px%20solid%20%23ccc%3B%0Afont%2Dsize%3A%20105%25%3B%0A%7D%0Aa%20%7B%0Acolor%3A%20%230033dd%3B%0Atext%2Ddecoration%3A%20none%3B%0A%7D%0Aa%3Ahover%20%7B%0Acolor%3A%20%236666ff%3B%20%7D%0Aa%3Avisited%20%7B%0Acolor%3A%20%23800080%3B%20%7D%0Aa%3Avisited%3Ahover%20%7B%0Acolor%3A%20%23BB00BB%3B%20%7D%0Aa%5Bhref%5E%3D%22http%3A%22%5D%20%7B%0Atext%2Ddecoration%3A%20underline%3B%20%7D%0Aa%5Bhref%5E%3D%22https%3A%22%5D%20%7B%0Atext%2Ddecoration%3A%20underline%3B%20%7D%0A%0Acode%20%3E%20span%2Ekw%20%7B%20color%3A%20%23555%3B%20font%2Dweight%3A%20bold%3B%20%7D%20%0Acode%20%3E%20span%2Edt%20%7B%20color%3A%20%23902000%3B%20%7D%20%0Acode%20%3E%20span%2Edv%20%7B%20color%3A%20%2340a070%3B%20%7D%20%0Acode%20%3E%20span%2Ebn%20%7B%20color%3A%20%23d14%3B%20%7D%20%0Acode%20%3E%20span%2Efl%20%7B%20color%3A%20%23d14%3B%20%7D%20%0Acode%20%3E%20span%2Ech%20%7B%20color%3A%20%23d14%3B%20%7D%20%0Acode%20%3E%20span%2Est%20%7B%20color%3A%20%23d14%3B%20%7D%20%0Acode%20%3E%20span%2Eco%20%7B%20color%3A%20%23888888%3B%20font%2Dstyle%3A%20italic%3B%20%7D%20%0Acode%20%3E%20span%2Eot%20%7B%20color%3A%20%23007020%3B%20%7D%20%0Acode%20%3E%20span%2Eal%20%7B%20color%3A%20%23ff0000%3B%20font%2Dweight%3A%20bold%3B%20%7D%20%0Acode%20%3E%20span%2Efu%20%7B%20color%3A%20%23900%3B%20font%2Dweight%3A%20bold%3B%20%7D%20%0Acode%20%3E%20span%2Eer%20%7B%20color%3A%20%23a61717%3B%20background%2Dcolor%3A%20%23e3d2d2%3B%20%7D%20%0A" type="text/css" />
 
 
 
@@ -337,164 +145,94 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 
 
-<h1 class="title toc-ignore">Monte-Carlo Consistent Partial Least
-Squares</h1>
+<h1 class="title toc-ignore">Monte-Carlo Consistent Partial Least Squares</h1>
 
 
 
-<p>The <code>plssem</code> package implements <em>Monte-Carlo Consistent
-Partial Least Squares</em> (MC-PLSc). This vignette gives an intuitive
-explanation of the core idea using a small toy example (a single
-correlation).</p>
+<p>The <code>plssem</code> package implements <em>Monte-Carlo Consistent Partial Least Squares</em> (MC-PLSc). This vignette gives an intuitive explanation of the core idea using a small toy example (a single correlation).</p>
 <p>For a more formal definition see <a href="https://osf.io/preprints/psyarxiv/fwzj6_v1" class="uri">https://osf.io/preprints/psyarxiv/fwzj6_v1</a>.</p>
-<p>MC-PLSc starts from the observation that PLS can be a biased
-estimator for common factor models (e.g., models with reflective
-measurement), and that additional bias is introduced when ordinal
-indicators are treated as continuous.</p>
-<p>The key move is to <em>explicitly model the bias</em> of the
-estimator under the assumed data-generating process, and then adjust
-parameters until simulated data reproduces the observed (biased)
-estimates.</p>
+<p>MC-PLSc starts from the observation that PLS can be a biased estimator for common factor models (e.g., models with reflective measurement), and that additional bias is introduced when ordinal indicators are treated as continuous.</p>
+<p>The key move is to <em>explicitly model the bias</em> of the estimator under the assumed data-generating process, and then adjust parameters until simulated data reproduces the observed (biased) estimates.</p>
 <div id="a-toy-example-bias-from-dichotomization" class="section level1">
 <h1>A Toy Example: Bias From Dichotomization</h1>
-<p>Consider the correlation <span class="math inline">\(r\)</span>
-between continuous variables <span class="math inline">\(x\)</span> and
-<span class="math inline">\(y\)</span>.</p>
-<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">7208094</span>)</span>
-<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>n <span class="ot">&lt;-</span> <span class="dv">10000</span></span>
-<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>r <span class="ot">&lt;-</span> <span class="fl">0.6</span></span>
-<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>x <span class="ot">&lt;-</span> <span class="fu">rnorm</span>(n)</span>
-<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>y <span class="ot">&lt;-</span> r <span class="sc">*</span> x <span class="sc">+</span> <span class="fu">rnorm</span>(n, <span class="at">sd =</span> <span class="fu">sqrt</span>(<span class="dv">1</span> <span class="sc">-</span> r<span class="sc">^</span><span class="dv">2</span>))</span>
-<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a><span class="fu">cor</span>(x, y)</span>
-<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a><span class="co">#&gt; [1] 0.6050904</span></span></code></pre></div>
-<p>Let’s then say that we only have access to a set of binary
-representations of <span class="math inline">\(x\)</span> and <span class="math inline">\(y\)</span>, <span class="math inline">\(z\)</span>
-and <span class="math inline">\(w\)</span>. Here we just split <span class="math inline">\(x\)</span> and <span class="math inline">\(y\)</span> in the middle.</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>z <span class="ot">&lt;-</span> <span class="fu">as.integer</span>(x <span class="sc">-</span> <span class="fu">mean</span>(x) <span class="sc">&gt;</span> <span class="dv">0</span>)</span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>w <span class="ot">&lt;-</span> <span class="fu">as.integer</span>(y <span class="sc">-</span> <span class="fu">mean</span>(y) <span class="sc">&gt;</span> <span class="dv">0</span>)</span></code></pre></div>
-<p>If we calculate the correlation between <span class="math inline">\(z\)</span> and <span class="math inline">\(w\)</span>, we get a biased estimate of the
-underlying correlation <span class="math inline">\(r\)</span>.</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">cor</span>(z, w)</span>
-<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="co">#&gt; [1] 0.4099247</span></span></code></pre></div>
-<p>Even though <code>cor(z, w)</code> is a biased estimate of <span class="math inline">\(r\)</span>, it is still an informative measure of
-<span class="math inline">\(r\)</span>. The MC-PLSc algorithm formalizes
-this by:</p>
+<p>Consider the correlation <span class="math inline">\(r\)</span> between continuous variables <span class="math inline">\(x\)</span> and <span class="math inline">\(y\)</span>.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">7208094</span>)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>n <span class="ot">&lt;-</span> <span class="dv">10000</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>r <span class="ot">&lt;-</span> <span class="fl">0.6</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>x <span class="ot">&lt;-</span> <span class="fu">rnorm</span>(n)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>y <span class="ot">&lt;-</span> r <span class="sc">*</span> x <span class="sc">+</span> <span class="fu">rnorm</span>(n, <span class="at">sd =</span> <span class="fu">sqrt</span>(<span class="dv">1</span> <span class="sc">-</span> r<span class="sc">^</span><span class="dv">2</span>))</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">cor</span>(x, y)</span></code></pre></div>
+<p>Let’s then say that we only have access to a set of binary representations of <span class="math inline">\(x\)</span> and <span class="math inline">\(y\)</span>, <span class="math inline">\(z\)</span> and <span class="math inline">\(w\)</span>. Here we just split <span class="math inline">\(x\)</span> and <span class="math inline">\(y\)</span> in the middle.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>z <span class="ot">&lt;-</span> <span class="fu">as.integer</span>(x <span class="sc">-</span> <span class="fu">mean</span>(x) <span class="sc">&gt;</span> <span class="dv">0</span>)</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>w <span class="ot">&lt;-</span> <span class="fu">as.integer</span>(y <span class="sc">-</span> <span class="fu">mean</span>(y) <span class="sc">&gt;</span> <span class="dv">0</span>)</span></code></pre></div>
+<p>If we calculate the correlation between <span class="math inline">\(z\)</span> and <span class="math inline">\(w\)</span>, we get a biased estimate of the underlying correlation <span class="math inline">\(r\)</span>.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">cor</span>(z, w)</span></code></pre></div>
+<p>Even though <code>cor(z, w)</code> is a biased estimate of <span class="math inline">\(r\)</span>, it is still an informative measure of <span class="math inline">\(r\)</span>. The MC-PLSc algorithm formalizes this by:</p>
 <ol style="list-style-type: decimal">
 <li>proposing a data-generating model,</li>
 <li>simulating data under candidate parameters, and</li>
-<li>searching for parameters that make the simulated estimator match the
-observed one.</li>
+<li>searching for parameters that make the simulated estimator match the observed one.</li>
 </ol>
 <p>In this toy example:</p>
 <ul>
-<li><code>g()</code> simulates <em>binary</em> data given a candidate
-value of <span class="math inline">\(r\)</span>.</li>
-<li><code>f()</code> is the estimator applied to that simulated data
-(here: <code>cor()</code>).</li>
+<li><code>g()</code> simulates <em>binary</em> data given a candidate value of <span class="math inline">\(r\)</span>.</li>
+<li><code>f()</code> is the estimator applied to that simulated data (here: <code>cor()</code>).</li>
 </ul>
-<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>g <span class="ot">&lt;-</span> <span class="cf">function</span>(r_hat, <span class="at">R =</span> <span class="dv">5000</span>) {</span>
-<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>  <span class="co"># Generate continuous data</span></span>
-<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>  x <span class="ot">&lt;-</span> <span class="fu">rnorm</span>(R)</span>
-<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>  y <span class="ot">&lt;-</span> r_hat <span class="sc">*</span> x <span class="sc">+</span> <span class="fu">rnorm</span>(R, <span class="at">sd =</span> <span class="fu">sqrt</span>(<span class="dv">1</span> <span class="sc">-</span> r_hat<span class="sc">^</span><span class="dv">2</span>))</span>
-<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a></span>
-<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>  <span class="co"># Generate binary data</span></span>
-<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>  z <span class="ot">&lt;-</span> <span class="fu">as.integer</span>(x <span class="sc">-</span> <span class="fu">mean</span>(x) <span class="sc">&gt;</span> <span class="dv">0</span>)</span>
-<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>  w <span class="ot">&lt;-</span> <span class="fu">as.integer</span>(y <span class="sc">-</span> <span class="fu">mean</span>(y) <span class="sc">&gt;</span> <span class="dv">0</span>)</span>
-<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a></span>
-<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>  <span class="co"># Return a data.frame</span></span>
-<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>  <span class="fu">data.frame</span>(z, w)</span>
-<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a>}</span>
-<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a></span>
-<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a>f <span class="ot">&lt;-</span> <span class="cf">function</span>(df) {</span>
-<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a>  <span class="co"># Biased correlation between binary data</span></span>
-<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a>  <span class="fu">cor</span>(df<span class="sc">$</span>z, df<span class="sc">$</span>w)</span>
-<span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a>}</span></code></pre></div>
-<p>Putting <code>f()</code> and <code>g()</code> together, we can try
-different values of <span class="math inline">\(\hat{r}\)</span> and see
-which one reproduces the observed <code>cor(z, w)</code>.</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">f</span>(<span class="fu">g</span>(<span class="fl">0.0</span>)))</span>
-<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="co">#&gt; [1] 0.01282723</span></span>
-<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">f</span>(<span class="fu">g</span>(<span class="fl">0.3</span>)))</span>
-<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="co">#&gt; [1] 0.1791825</span></span>
-<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">f</span>(<span class="fu">g</span>(<span class="fl">0.5</span>)))</span>
-<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a><span class="co">#&gt; [1] 0.3203944</span></span>
-<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">f</span>(<span class="fu">g</span>(<span class="fl">0.6</span>)))</span>
-<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a><span class="co">#&gt; [1] 0.4191969</span></span></code></pre></div>
-<p>The true value (here, <span class="math inline">\(r = 0.6\)</span>)
-gets us close, but in practice we do not know <span class="math inline">\(r\)</span>. So we rephrase this as a
-<em>root-finding problem</em>: find <span class="math inline">\(\hat{r}\)</span> such that the simulated
-correlation matches the observed biased one.</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>r_biased_observed <span class="ot">&lt;-</span> <span class="fu">cor</span>(z, w)</span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>h <span class="ot">&lt;-</span> <span class="cf">function</span>(r_hat) {</span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="fu">f</span>(<span class="fu">g</span>(r_hat)) <span class="sc">-</span> r_biased_observed</span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>}</span></code></pre></div>
-<p>The full MC-PLSc algorithm uses Robbins-Monro (1951) stochastic
-approximation, to estimate the root of <span class="math inline">\(h(\hat{r})\)</span>. Below we use a simplified
-approach, where we iteratively nudge <span class="math inline">\(\hat{r}\)</span> in the direction that reduces the
-mismatch <span class="math inline">\(h(\hat{r})\)</span>.</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>r_hat <span class="ot">&lt;-</span> r_biased_observed <span class="co"># reasonable starting value</span></span>
-<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>iter <span class="ot">&lt;-</span> <span class="dv">20</span></span>
-<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>history <span class="ot">&lt;-</span> r_hat</span>
-<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a></span>
-<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="fu">seq_len</span>(iter)) {</span>
-<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>  temperature <span class="ot">&lt;-</span> <span class="dv">1</span> <span class="sc">/</span> <span class="fu">sqrt</span>(i)</span>
-<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>  epsilon <span class="ot">&lt;-</span> <span class="fu">h</span>(r_hat)</span>
-<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a></span>
-<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>  <span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">&quot;Iteration: %2d, r_hat: %.3f, epsilon: %6.3f</span><span class="sc">\n</span><span class="st">&quot;</span>, i, r_hat, epsilon))</span>
-<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a></span>
-<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a>  r_hat <span class="ot">&lt;-</span> r_hat <span class="sc">-</span> temperature <span class="sc">*</span> epsilon</span>
-<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a>  history <span class="ot">&lt;-</span> <span class="fu">c</span>(history, r_hat)</span>
-<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a>}</span>
-<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a><span class="co">#&gt; Iteration:  1, r_hat: 0.410, epsilon: -0.131</span></span>
-<span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a><span class="co">#&gt; Iteration:  2, r_hat: 0.541, epsilon: -0.058</span></span>
-<span id="cb7-16"><a href="#cb7-16" tabindex="-1"></a><span class="co">#&gt; Iteration:  3, r_hat: 0.582, epsilon: -0.004</span></span>
-<span id="cb7-17"><a href="#cb7-17" tabindex="-1"></a><span class="co">#&gt; Iteration:  4, r_hat: 0.584, epsilon: -0.024</span></span>
-<span id="cb7-18"><a href="#cb7-18" tabindex="-1"></a><span class="co">#&gt; Iteration:  5, r_hat: 0.596, epsilon: -0.000</span></span>
-<span id="cb7-19"><a href="#cb7-19" tabindex="-1"></a><span class="co">#&gt; Iteration:  6, r_hat: 0.597, epsilon: -0.004</span></span>
-<span id="cb7-20"><a href="#cb7-20" tabindex="-1"></a><span class="co">#&gt; Iteration:  7, r_hat: 0.598, epsilon: -0.008</span></span>
-<span id="cb7-21"><a href="#cb7-21" tabindex="-1"></a><span class="co">#&gt; Iteration:  8, r_hat: 0.601, epsilon:  0.019</span></span>
-<span id="cb7-22"><a href="#cb7-22" tabindex="-1"></a><span class="co">#&gt; Iteration:  9, r_hat: 0.594, epsilon: -0.019</span></span>
-<span id="cb7-23"><a href="#cb7-23" tabindex="-1"></a><span class="co">#&gt; Iteration: 10, r_hat: 0.601, epsilon: -0.010</span></span>
-<span id="cb7-24"><a href="#cb7-24" tabindex="-1"></a><span class="co">#&gt; Iteration: 11, r_hat: 0.604, epsilon:  0.009</span></span>
-<span id="cb7-25"><a href="#cb7-25" tabindex="-1"></a><span class="co">#&gt; Iteration: 12, r_hat: 0.601, epsilon:  0.029</span></span>
-<span id="cb7-26"><a href="#cb7-26" tabindex="-1"></a><span class="co">#&gt; Iteration: 13, r_hat: 0.593, epsilon: -0.010</span></span>
-<span id="cb7-27"><a href="#cb7-27" tabindex="-1"></a><span class="co">#&gt; Iteration: 14, r_hat: 0.595, epsilon:  0.009</span></span>
-<span id="cb7-28"><a href="#cb7-28" tabindex="-1"></a><span class="co">#&gt; Iteration: 15, r_hat: 0.593, epsilon: -0.011</span></span>
-<span id="cb7-29"><a href="#cb7-29" tabindex="-1"></a><span class="co">#&gt; Iteration: 16, r_hat: 0.596, epsilon:  0.001</span></span>
-<span id="cb7-30"><a href="#cb7-30" tabindex="-1"></a><span class="co">#&gt; Iteration: 17, r_hat: 0.595, epsilon: -0.007</span></span>
-<span id="cb7-31"><a href="#cb7-31" tabindex="-1"></a><span class="co">#&gt; Iteration: 18, r_hat: 0.597, epsilon: -0.017</span></span>
-<span id="cb7-32"><a href="#cb7-32" tabindex="-1"></a><span class="co">#&gt; Iteration: 19, r_hat: 0.601, epsilon: -0.007</span></span>
-<span id="cb7-33"><a href="#cb7-33" tabindex="-1"></a><span class="co">#&gt; Iteration: 20, r_hat: 0.603, epsilon:  0.005</span></span></code></pre></div>
-<p>The sequence typically stabilizes near the underlying continuous
-correlation. To visualize the stabilization more clearly, we can fit a
-simple exponential curve to the iteration history and plot the fitted
-trajectory. Here we can see that we seem to approach a very good
-approximation of <span class="math inline">\(r\)</span>.</p>
-<p><img role="img" src="data:image/png;base64,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" /><!-- --></p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>g <span class="ot">&lt;-</span> <span class="cf">function</span>(r_hat, <span class="at">R =</span> <span class="dv">5000</span>) {</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Generate continuous data</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  x <span class="ot">&lt;-</span> <span class="fu">rnorm</span>(R)</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  y <span class="ot">&lt;-</span> r_hat <span class="sc">*</span> x <span class="sc">+</span> <span class="fu">rnorm</span>(R, <span class="at">sd =</span> <span class="fu">sqrt</span>(<span class="dv">1</span> <span class="sc">-</span> r_hat<span class="sc">^</span><span class="dv">2</span>))</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Generate binary data</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  z <span class="ot">&lt;-</span> <span class="fu">as.integer</span>(x <span class="sc">-</span> <span class="fu">mean</span>(x) <span class="sc">&gt;</span> <span class="dv">0</span>)</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  w <span class="ot">&lt;-</span> <span class="fu">as.integer</span>(y <span class="sc">-</span> <span class="fu">mean</span>(y) <span class="sc">&gt;</span> <span class="dv">0</span>)</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Return a data.frame</span></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">data.frame</span>(z, w)</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>f <span class="ot">&lt;-</span> <span class="cf">function</span>(df) {</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Biased correlation between binary data</span></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cor</span>(df<span class="sc">$</span>z, df<span class="sc">$</span>w)</span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>Putting <code>f()</code> and <code>g()</code> together, we can try different values of <span class="math inline">\(\hat{r}\)</span> and see which one reproduces the observed <code>cor(z, w)</code>.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">f</span>(<span class="fu">g</span>(<span class="fl">0.0</span>)))</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">f</span>(<span class="fu">g</span>(<span class="fl">0.3</span>)))</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">f</span>(<span class="fu">g</span>(<span class="fl">0.5</span>)))</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">f</span>(<span class="fu">g</span>(<span class="fl">0.6</span>)))</span></code></pre></div>
+<p>The true value (here, <span class="math inline">\(r = 0.6\)</span>) gets us close, but in practice we do not know <span class="math inline">\(r\)</span>. So we rephrase this as a <em>root-finding problem</em>: find <span class="math inline">\(\hat{r}\)</span> such that the simulated correlation matches the observed biased one.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>r_biased_observed <span class="ot">&lt;-</span> <span class="fu">cor</span>(z, w)</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>h <span class="ot">&lt;-</span> <span class="cf">function</span>(r_hat) {</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">f</span>(<span class="fu">g</span>(r_hat)) <span class="sc">-</span> r_biased_observed</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>The full MC-PLSc algorithm uses Robbins-Monro (1951) stochastic approximation, to estimate the root of <span class="math inline">\(h(\hat{r})\)</span>. Below we use a simplified approach, where we iteratively nudge <span class="math inline">\(\hat{r}\)</span> in the direction that reduces the mismatch <span class="math inline">\(h(\hat{r})\)</span>.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>r_hat <span class="ot">&lt;-</span> r_biased_observed <span class="co"># reasonable starting value</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>iter <span class="ot">&lt;-</span> <span class="dv">20</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>history <span class="ot">&lt;-</span> r_hat</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="fu">seq_len</span>(iter)) {</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>  temperature <span class="ot">&lt;-</span> <span class="dv">1</span> <span class="sc">/</span> <span class="fu">sqrt</span>(i)</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>  epsilon <span class="ot">&lt;-</span> <span class="fu">h</span>(r_hat)</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">&quot;Iteration: %2d, r_hat: %.3f, epsilon: %6.3f</span><span class="sc">\n</span><span class="st">&quot;</span>, i, r_hat, epsilon))</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>  r_hat <span class="ot">&lt;-</span> r_hat <span class="sc">-</span> temperature <span class="sc">*</span> epsilon</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>  history <span class="ot">&lt;-</span> <span class="fu">c</span>(history, r_hat)</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>The sequence typically stabilizes near the underlying continuous correlation. To visualize the stabilization more clearly, we can fit a simple exponential curve to the iteration history and plot the fitted trajectory. Here we can see that we seem to approach a very good approximation of <span class="math inline">\(r\)</span>.</p>
 </div>
 <div id="from-the-toy-example-to-mc-plsc" class="section level1">
 <h1>From The Toy Example to MC-PLSc</h1>
 <p>This toy example has the same basic structure as MC-PLSc:</p>
 <ul>
-<li><code>g()</code> becomes a simulator for your SEM (measurement +
-structural model, including the indicator scales, e.g., ordinal
-thresholds).</li>
-<li><code>f()</code> becomes “run PLS under the same estimation settings
-as for the real data, then extract the parameters of interest”.</li>
+<li><code>g()</code> becomes a simulator for your SEM (measurement + structural model, including the indicator scales, e.g., ordinal thresholds).</li>
+<li><code>f()</code> becomes “run PLS under the same estimation settings as for the real data, then extract the parameters of interest”.</li>
 </ul>
-<p>The Monte-Carlo loop then searches for parameters that are
-<em>consistent</em> with the observed PLS estimates under the assumed
-data model.</p>
-<p>Here we can see the corresponding estimates using the MC-PLSc
-algorithm, via the <code>pls()</code> function.</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2346259</span>)</span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="fu">pls</span>(<span class="st">&#39;y ~ x&#39;</span>, <span class="at">data =</span> <span class="fu">data.frame</span>(<span class="at">x =</span> z, <span class="at">y =</span> w),</span>
-<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>    <span class="at">ordered =</span> <span class="fu">c</span>(<span class="st">&quot;y&quot;</span>, <span class="st">&quot;x&quot;</span>), <span class="at">mcpls =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a><span class="co">#&gt; plssem (0.1.2) ended normally after 53 iterations</span></span>
-<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a><span class="co">#&gt;   lhs op rhs   est se  z pvalue ci.lower ci.upper</span></span>
-<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a><span class="co">#&gt; 1   y  ~   x 0.600 NA NA     NA       NA       NA</span></span>
-<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a><span class="co">#&gt; 2   y ~~   y 0.641 NA NA     NA       NA       NA</span></span>
-<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a><span class="co">#&gt; 3   x ~~   x 1.000 NA NA     NA       NA       NA</span></span></code></pre></div>
+<p>The Monte-Carlo loop then searches for parameters that are <em>consistent</em> with the observed PLS estimates under the assumed data model.</p>
+<p>Here we can see the corresponding estimates using the MC-PLSc algorithm, via the <code>pls()</code> function.</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2346259</span>)</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="fu">pls</span>(<span class="st">&#39;y ~ x&#39;</span>, <span class="at">data =</span> <span class="fu">data.frame</span>(<span class="at">x =</span> z, <span class="at">y =</span> w),</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">ordered =</span> <span class="fu">c</span>(<span class="st">&quot;y&quot;</span>, <span class="st">&quot;x&quot;</span>), <span class="at">mcpls =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
 </div>
 
 

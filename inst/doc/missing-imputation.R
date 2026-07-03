@@ -2,7 +2,7 @@
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
-  eval = FALSE
+  eval = identical(Sys.getenv("IN_PKGDOWN"), "true")
 )
 
 library(plssem)
@@ -45,6 +45,6 @@ library(plssem)
 #   BOOT <- rbind(BOOT, boot(fit.i))
 # }
 # 
-# apply(COEF, MARGIN = 2, FUN = mean) # Mean estimate across imputations
-# apply(BOOT, MARGIN = 2, FUN = sd)   # Standard errors
+# round(apply(COEF, MARGIN = 2, FUN = mean), 3) # Mean estimate across imputations
+# round(apply(BOOT, MARGIN = 2, FUN = sd), 3)   # Standard errors
 

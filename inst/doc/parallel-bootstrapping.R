@@ -1,19 +1,20 @@
 ## ----setup, include=FALSE-----------------------------------------------------
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment = "#>"
+  comment = "#>",
+  eval = identical(Sys.getenv("IN_PKGDOWN"), "true")
 )
 
 library(plssem)
 
 ## ----syntax-------------------------------------------------------------------
-m <- '
-  X =~ x1 + x2 + x3
-  Z =~ z1 + z2 + z3
-  Y =~ y1 + y2 + y3
-
-  Y ~ X + Z + X:Z
-'
+# m <- '
+#   X =~ x1 + x2 + x3
+#   Z =~ z1 + z2 + z3
+#   Y =~ y1 + y2 + y3
+# 
+#   Y ~ X + Z + X:Z
+# '
 
 ## ----boot-windows, eval = FALSE-----------------------------------------------
 # fit_ms <- pls(

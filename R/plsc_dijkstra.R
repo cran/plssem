@@ -127,7 +127,7 @@ limitQ <- function(Q, lv, zero.tol = 1e-5) {
 
   } else if (Q > 1) {
     pls_msg_warn(sprintf(
-      "Reliability for %s is larger than 1! Q\u00B2(%s) = %.2f",
+      MSG_STRINGS$strings$limitQ0,
       lv, lv, Q^2
     ))
 
@@ -136,7 +136,7 @@ limitQ <- function(Q, lv, zero.tol = 1e-5) {
   } else if (Q <= zero.tol) {
 
     pls_msg_warn(sprintf(
-      "Reliability is close too or smaller than zero! Q\u00B2(%s) = %.2g",
+      MSG_STRINGS$strings$limitQ1,
       lv, lv, Q^2
     ))
 
@@ -155,5 +155,15 @@ needsAdditionalDistributionalAssumptions <- function(terms) {
 }
 
 
-# getConsistentCorrelationMatrix — work in progress, currently disabled.
-# See nlin_djikstra_correction.R for the partial implementation.
+plsConstructQualities <- function(object) {
+  fit <- modelFit(combinedModel(object))
+  Q <- fit$Q
+
+  if (length(Q)) Q else NULL
+}
+
+
+plsConstructReliabilities <- function(object) {
+  Q <- plsConstructQualities(object)
+  if (length(Q)) Q^2 else NULL
+}

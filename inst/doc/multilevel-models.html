@@ -14,41 +14,28 @@
 
 <title>Multilevel Models with plssem</title>
 
-<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
-// be compatible with the behavior of Pandoc < 2.8).
-document.addEventListener('DOMContentLoaded', function(e) {
-  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
-  var i, h, a;
-  for (i = 0; i < hs.length; i++) {
-    h = hs[i];
-    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
-    a = h.attributes;
-    while (a.length > 0) h.removeAttribute(a[0].name);
+<script src="data:application/javascript;base64,Ly8gUGFuZG9jIDIuOSBhZGRzIGF0dHJpYnV0ZXMgb24gYm90aCBoZWFkZXIgYW5kIGRpdi4gV2UgcmVtb3ZlIHRoZSBmb3JtZXIgKHRvCi8vIGJlIGNvbXBhdGlibGUgd2l0aCB0aGUgYmVoYXZpb3Igb2YgUGFuZG9jIDwgMi44KS4KZG9jdW1lbnQuYWRkRXZlbnRMaXN0ZW5lcignRE9NQ29udGVudExvYWRlZCcsIGZ1bmN0aW9uKGUpIHsKICB2YXIgaHMgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yQWxsKCJkaXYuc2VjdGlvbltjbGFzcyo9J2xldmVsJ10gPiA6Zmlyc3QtY2hpbGQiKTsKICB2YXIgaSwgaCwgYTsKICBmb3IgKGkgPSAwOyBpIDwgaHMubGVuZ3RoOyBpKyspIHsKICAgIGggPSBoc1tpXTsKICAgIGlmICghL15oWzEtNl0kL2kudGVzdChoLnRhZ05hbWUpKSBjb250aW51ZTsgIC8vIGl0IHNob3VsZCBiZSBhIGhlYWRlciBoMS1oNgogICAgYSA9IGguYXR0cmlidXRlczsKICAgIHdoaWxlIChhLmxlbmd0aCA+IDApIGgucmVtb3ZlQXR0cmlidXRlKGFbMF0ubmFtZSk7CiAgfQp9KTsK"></script>
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+
+
+<style type="text/css">
+  code {
+    white-space: pre;
   }
-});
-</script>
-
-<style type="text/css">
-code{white-space: pre-wrap;}
-span.smallcaps{font-variant: small-caps;}
-span.underline{text-decoration: underline;}
-div.column{display: inline-block; vertical-align: top; width: 50%;}
-div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
-ul.task-list{list-style: none;}
-</style>
-
-
-
-<style type="text/css">
-code {
-white-space: pre;
-}
-.sourceCode {
-overflow: visible;
-}
+  .sourceCode {
+    overflow: visible;
+  }
 </style>
 <style type="text/css" data-origin="pandoc">
-html { -webkit-text-size-adjust: 100%; }
 pre > code.sourceCode { white-space: pre; position: relative; }
 pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
@@ -64,54 +51,55 @@ pre > code.sourceCode { white-space: pre-wrap; }
 pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
 }
 pre.numberSource code
-{ counter-reset: source-line 0; }
+  { counter-reset: source-line 0; }
 pre.numberSource code > span
-{ position: relative; left: -4em; counter-increment: source-line; }
+  { position: relative; left: -4em; counter-increment: source-line; }
 pre.numberSource code > span > a:first-child::before
-{ content: counter(source-line);
-position: relative; left: -1em; text-align: right; vertical-align: baseline;
-border: none; display: inline-block;
--webkit-touch-callout: none; -webkit-user-select: none;
--khtml-user-select: none; -moz-user-select: none;
--ms-user-select: none; user-select: none;
-padding: 0 4px; width: 4em;
-color: #aaaaaa;
-}
-pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
 div.sourceCode
-{ }
+  {   }
 @media screen {
 pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
 }
-code span.al { color: #ff0000; font-weight: bold; } 
-code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
-code span.at { color: #7d9029; } 
-code span.bn { color: #40a070; } 
-code span.bu { color: #008000; } 
-code span.cf { color: #007020; font-weight: bold; } 
-code span.ch { color: #4070a0; } 
-code span.cn { color: #880000; } 
-code span.co { color: #60a0b0; font-style: italic; } 
-code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
-code span.do { color: #ba2121; font-style: italic; } 
-code span.dt { color: #902000; } 
-code span.dv { color: #40a070; } 
-code span.er { color: #ff0000; font-weight: bold; } 
-code span.ex { } 
-code span.fl { color: #40a070; } 
-code span.fu { color: #06287e; } 
-code span.im { color: #008000; font-weight: bold; } 
-code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
-code span.kw { color: #007020; font-weight: bold; } 
-code span.op { color: #666666; } 
-code span.ot { color: #007020; } 
-code span.pp { color: #bc7a00; } 
-code span.sc { color: #4070a0; } 
-code span.ss { color: #bb6688; } 
-code span.st { color: #4070a0; } 
-code span.va { color: #19177c; } 
-code span.vs { color: #4070a0; } 
-code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+
 </style>
 <script>
 // apply pandoc div.sourceCode style to pre.sourceCode instead
@@ -145,187 +133,7 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; }
 
 
 
-<style type="text/css">body {
-background-color: #fff;
-margin: 1em auto;
-max-width: 700px;
-overflow: visible;
-padding-left: 2em;
-padding-right: 2em;
-font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
-font-size: 14px;
-line-height: 1.35;
-}
-#TOC {
-clear: both;
-margin: 0 0 10px 10px;
-padding: 4px;
-width: 400px;
-border: 1px solid #CCCCCC;
-border-radius: 5px;
-background-color: #f6f6f6;
-font-size: 13px;
-line-height: 1.3;
-}
-#TOC .toctitle {
-font-weight: bold;
-font-size: 15px;
-margin-left: 5px;
-}
-#TOC ul {
-padding-left: 40px;
-margin-left: -1.5em;
-margin-top: 5px;
-margin-bottom: 5px;
-}
-#TOC ul ul {
-margin-left: -2em;
-}
-#TOC li {
-line-height: 16px;
-}
-table {
-margin: 1em auto;
-border-width: 1px;
-border-color: #DDDDDD;
-border-style: outset;
-border-collapse: collapse;
-}
-table th {
-border-width: 2px;
-padding: 5px;
-border-style: inset;
-}
-table td {
-border-width: 1px;
-border-style: inset;
-line-height: 18px;
-padding: 5px 5px;
-}
-table, table th, table td {
-border-left-style: none;
-border-right-style: none;
-}
-table thead, table tr.even {
-background-color: #f7f7f7;
-}
-p {
-margin: 0.5em 0;
-}
-blockquote {
-background-color: #f6f6f6;
-padding: 0.25em 0.75em;
-}
-hr {
-border-style: solid;
-border: none;
-border-top: 1px solid #777;
-margin: 28px 0;
-}
-dl {
-margin-left: 0;
-}
-dl dd {
-margin-bottom: 13px;
-margin-left: 13px;
-}
-dl dt {
-font-weight: bold;
-}
-ul {
-margin-top: 0;
-}
-ul li {
-list-style: circle outside;
-}
-ul ul {
-margin-bottom: 0;
-}
-pre, code {
-background-color: #f7f7f7;
-border-radius: 3px;
-color: #333;
-white-space: pre-wrap; 
-}
-pre {
-border-radius: 3px;
-margin: 5px 0px 10px 0px;
-padding: 10px;
-}
-pre:not([class]) {
-background-color: #f7f7f7;
-}
-code {
-font-family: Consolas, Monaco, 'Courier New', monospace;
-font-size: 85%;
-}
-p > code, li > code {
-padding: 2px 0px;
-}
-div.figure {
-text-align: center;
-}
-img {
-background-color: #FFFFFF;
-padding: 2px;
-border: 1px solid #DDDDDD;
-border-radius: 3px;
-border: 1px solid #CCCCCC;
-margin: 0 5px;
-}
-h1 {
-margin-top: 0;
-font-size: 35px;
-line-height: 40px;
-}
-h2 {
-border-bottom: 4px solid #f7f7f7;
-padding-top: 10px;
-padding-bottom: 2px;
-font-size: 145%;
-}
-h3 {
-border-bottom: 2px solid #f7f7f7;
-padding-top: 10px;
-font-size: 120%;
-}
-h4 {
-border-bottom: 1px solid #f7f7f7;
-margin-left: 8px;
-font-size: 105%;
-}
-h5, h6 {
-border-bottom: 1px solid #ccc;
-font-size: 105%;
-}
-a {
-color: #0033dd;
-text-decoration: none;
-}
-a:hover {
-color: #6666ff; }
-a:visited {
-color: #800080; }
-a:visited:hover {
-color: #BB00BB; }
-a[href^="http:"] {
-text-decoration: underline; }
-a[href^="https:"] {
-text-decoration: underline; }
-
-code > span.kw { color: #555; font-weight: bold; } 
-code > span.dt { color: #902000; } 
-code > span.dv { color: #40a070; } 
-code > span.bn { color: #d14; } 
-code > span.fl { color: #d14; } 
-code > span.ch { color: #d14; } 
-code > span.st { color: #d14; } 
-code > span.co { color: #888888; font-style: italic; } 
-code > span.ot { color: #007020; } 
-code > span.al { color: #ff0000; font-weight: bold; } 
-code > span.fu { color: #900; font-weight: bold; } 
-code > span.er { color: #a61717; background-color: #e3d2d2; } 
-</style>
+<link rel="stylesheet" href="data:text/css,body%20%7B%0Abackground%2Dcolor%3A%20%23fff%3B%0Amargin%3A%201em%20auto%3B%0Amax%2Dwidth%3A%20700px%3B%0Aoverflow%3A%20visible%3B%0Apadding%2Dleft%3A%202em%3B%0Apadding%2Dright%3A%202em%3B%0Afont%2Dfamily%3A%20%22Open%20Sans%22%2C%20%22Helvetica%20Neue%22%2C%20Helvetica%2C%20Arial%2C%20sans%2Dserif%3B%0Afont%2Dsize%3A%2014px%3B%0Aline%2Dheight%3A%201%2E35%3B%0A%7D%0A%23TOC%20%7B%0Aclear%3A%20both%3B%0Amargin%3A%200%200%2010px%2010px%3B%0Apadding%3A%204px%3B%0Awidth%3A%20400px%3B%0Aborder%3A%201px%20solid%20%23CCCCCC%3B%0Aborder%2Dradius%3A%205px%3B%0Abackground%2Dcolor%3A%20%23f6f6f6%3B%0Afont%2Dsize%3A%2013px%3B%0Aline%2Dheight%3A%201%2E3%3B%0A%7D%0A%23TOC%20%2Etoctitle%20%7B%0Afont%2Dweight%3A%20bold%3B%0Afont%2Dsize%3A%2015px%3B%0Amargin%2Dleft%3A%205px%3B%0A%7D%0A%23TOC%20ul%20%7B%0Apadding%2Dleft%3A%2040px%3B%0Amargin%2Dleft%3A%20%2D1%2E5em%3B%0Amargin%2Dtop%3A%205px%3B%0Amargin%2Dbottom%3A%205px%3B%0A%7D%0A%23TOC%20ul%20ul%20%7B%0Amargin%2Dleft%3A%20%2D2em%3B%0A%7D%0A%23TOC%20li%20%7B%0Aline%2Dheight%3A%2016px%3B%0A%7D%0Atable%20%7B%0Amargin%3A%201em%20auto%3B%0Aborder%2Dwidth%3A%201px%3B%0Aborder%2Dcolor%3A%20%23DDDDDD%3B%0Aborder%2Dstyle%3A%20outset%3B%0Aborder%2Dcollapse%3A%20collapse%3B%0A%7D%0Atable%20th%20%7B%0Aborder%2Dwidth%3A%202px%3B%0Apadding%3A%205px%3B%0Aborder%2Dstyle%3A%20inset%3B%0A%7D%0Atable%20td%20%7B%0Aborder%2Dwidth%3A%201px%3B%0Aborder%2Dstyle%3A%20inset%3B%0Aline%2Dheight%3A%2018px%3B%0Apadding%3A%205px%205px%3B%0A%7D%0Atable%2C%20table%20th%2C%20table%20td%20%7B%0Aborder%2Dleft%2Dstyle%3A%20none%3B%0Aborder%2Dright%2Dstyle%3A%20none%3B%0A%7D%0Atable%20thead%2C%20table%20tr%2Eeven%20%7B%0Abackground%2Dcolor%3A%20%23f7f7f7%3B%0A%7D%0Ap%20%7B%0Amargin%3A%200%2E5em%200%3B%0A%7D%0Ablockquote%20%7B%0Abackground%2Dcolor%3A%20%23f6f6f6%3B%0Apadding%3A%200%2E25em%200%2E75em%3B%0A%7D%0Ahr%20%7B%0Aborder%2Dstyle%3A%20solid%3B%0Aborder%3A%20none%3B%0Aborder%2Dtop%3A%201px%20solid%20%23777%3B%0Amargin%3A%2028px%200%3B%0A%7D%0Adl%20%7B%0Amargin%2Dleft%3A%200%3B%0A%7D%0Adl%20dd%20%7B%0Amargin%2Dbottom%3A%2013px%3B%0Amargin%2Dleft%3A%2013px%3B%0A%7D%0Adl%20dt%20%7B%0Afont%2Dweight%3A%20bold%3B%0A%7D%0Aul%20%7B%0Amargin%2Dtop%3A%200%3B%0A%7D%0Aul%20li%20%7B%0Alist%2Dstyle%3A%20circle%20outside%3B%0A%7D%0Aul%20ul%20%7B%0Amargin%2Dbottom%3A%200%3B%0A%7D%0Apre%2C%20code%20%7B%0Abackground%2Dcolor%3A%20%23f7f7f7%3B%0Aborder%2Dradius%3A%203px%3B%0Acolor%3A%20%23333%3B%0Awhite%2Dspace%3A%20pre%2Dwrap%3B%20%0A%7D%0Apre%20%7B%0Aborder%2Dradius%3A%203px%3B%0Amargin%3A%205px%200px%2010px%200px%3B%0Apadding%3A%2010px%3B%0A%7D%0Apre%3Anot%28%5Bclass%5D%29%20%7B%0Abackground%2Dcolor%3A%20%23f7f7f7%3B%0A%7D%0Acode%20%7B%0Afont%2Dfamily%3A%20Consolas%2C%20Monaco%2C%20%27Courier%20New%27%2C%20monospace%3B%0Afont%2Dsize%3A%2085%25%3B%0A%7D%0Ap%20%3E%20code%2C%20li%20%3E%20code%20%7B%0Apadding%3A%202px%200px%3B%0A%7D%0Adiv%2Efigure%20%7B%0Atext%2Dalign%3A%20center%3B%0A%7D%0Aimg%20%7B%0Abackground%2Dcolor%3A%20%23FFFFFF%3B%0Apadding%3A%202px%3B%0Aborder%3A%201px%20solid%20%23DDDDDD%3B%0Aborder%2Dradius%3A%203px%3B%0Aborder%3A%201px%20solid%20%23CCCCCC%3B%0Amargin%3A%200%205px%3B%0A%7D%0Ah1%20%7B%0Amargin%2Dtop%3A%200%3B%0Afont%2Dsize%3A%2035px%3B%0Aline%2Dheight%3A%2040px%3B%0A%7D%0Ah2%20%7B%0Aborder%2Dbottom%3A%204px%20solid%20%23f7f7f7%3B%0Apadding%2Dtop%3A%2010px%3B%0Apadding%2Dbottom%3A%202px%3B%0Afont%2Dsize%3A%20145%25%3B%0A%7D%0Ah3%20%7B%0Aborder%2Dbottom%3A%202px%20solid%20%23f7f7f7%3B%0Apadding%2Dtop%3A%2010px%3B%0Afont%2Dsize%3A%20120%25%3B%0A%7D%0Ah4%20%7B%0Aborder%2Dbottom%3A%201px%20solid%20%23f7f7f7%3B%0Amargin%2Dleft%3A%208px%3B%0Afont%2Dsize%3A%20105%25%3B%0A%7D%0Ah5%2C%20h6%20%7B%0Aborder%2Dbottom%3A%201px%20solid%20%23ccc%3B%0Afont%2Dsize%3A%20105%25%3B%0A%7D%0Aa%20%7B%0Acolor%3A%20%230033dd%3B%0Atext%2Ddecoration%3A%20none%3B%0A%7D%0Aa%3Ahover%20%7B%0Acolor%3A%20%236666ff%3B%20%7D%0Aa%3Avisited%20%7B%0Acolor%3A%20%23800080%3B%20%7D%0Aa%3Avisited%3Ahover%20%7B%0Acolor%3A%20%23BB00BB%3B%20%7D%0Aa%5Bhref%5E%3D%22http%3A%22%5D%20%7B%0Atext%2Ddecoration%3A%20underline%3B%20%7D%0Aa%5Bhref%5E%3D%22https%3A%22%5D%20%7B%0Atext%2Ddecoration%3A%20underline%3B%20%7D%0A%0Acode%20%3E%20span%2Ekw%20%7B%20color%3A%20%23555%3B%20font%2Dweight%3A%20bold%3B%20%7D%20%0Acode%20%3E%20span%2Edt%20%7B%20color%3A%20%23902000%3B%20%7D%20%0Acode%20%3E%20span%2Edv%20%7B%20color%3A%20%2340a070%3B%20%7D%20%0Acode%20%3E%20span%2Ebn%20%7B%20color%3A%20%23d14%3B%20%7D%20%0Acode%20%3E%20span%2Efl%20%7B%20color%3A%20%23d14%3B%20%7D%20%0Acode%20%3E%20span%2Ech%20%7B%20color%3A%20%23d14%3B%20%7D%20%0Acode%20%3E%20span%2Est%20%7B%20color%3A%20%23d14%3B%20%7D%20%0Acode%20%3E%20span%2Eco%20%7B%20color%3A%20%23888888%3B%20font%2Dstyle%3A%20italic%3B%20%7D%20%0Acode%20%3E%20span%2Eot%20%7B%20color%3A%20%23007020%3B%20%7D%20%0Acode%20%3E%20span%2Eal%20%7B%20color%3A%20%23ff0000%3B%20font%2Dweight%3A%20bold%3B%20%7D%20%0Acode%20%3E%20span%2Efu%20%7B%20color%3A%20%23900%3B%20font%2Dweight%3A%20bold%3B%20%7D%20%0Acode%20%3E%20span%2Eer%20%7B%20color%3A%20%23a61717%3B%20background%2Dcolor%3A%20%23e3d2d2%3B%20%7D%20%0A" type="text/css" />
 
 
 
@@ -341,420 +149,65 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 
 
-<p>This vignette shows examples of multilevel random slopes and
-intercept models, with both continuous and ordinal data.</p>
+<p>This vignette shows examples of multilevel random slopes and intercept models, with both continuous and ordinal data.</p>
 <div id="random-slopes-model" class="section level2">
 <h2>Random Slopes Model</h2>
-<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>slopes_model <span class="ot">&lt;-</span> <span class="st">&quot;</span></span>
-<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="st">  X =~ x1 + x2 + x3</span></span>
-<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a><span class="st">  Z =~ z1 + z2 + z3</span></span>
-<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a><span class="st">  Y =~ y1 + y2 + y3</span></span>
-<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="st">  W =~ w1 + w2 + w3</span></span>
-<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a><span class="st">  Y ~ X + Z + (1 + X + Z | cluster)</span></span>
-<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a><span class="st">  W ~ X + Z + (1 + X + Z | cluster)</span></span>
-<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a><span class="st">&quot;</span></span></code></pre></div>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>slopes_model <span class="ot">&lt;-</span> <span class="st">&quot;</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="st">  X =~ x1 + x2 + x3</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="st">  Z =~ z1 + z2 + z3</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="st">  Y =~ y1 + y2 + y3</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="st">  W =~ w1 + w2 + w3</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="st">  Y ~ X + Z + (1 + X + Z | cluster)</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="st">  W ~ X + Z + (1 + X + Z | cluster)</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="st">&quot;</span></span></code></pre></div>
 <div id="continuous-indicators" class="section level3">
 <h3>Continuous Indicators</h3>
-<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>fit_slopes_cont <span class="ot">&lt;-</span> <span class="fu">pls</span>(</span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>  slopes_model,</span>
-<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>  <span class="at">data      =</span> randomSlopes,</span>
-<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>  <span class="at">bootstrap =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>  <span class="at">boot.R    =</span> <span class="dv">50</span></span>
-<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>)</span>
-<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="fu">summary</span>(fit_slopes_cont)</span>
-<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="co">#&gt; plssem (0.1.2) ended normally after 3 iterations</span></span>
-<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a><span class="co">#&gt;   Estimator                                   PLSc-MLM</span></span>
-<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a><span class="co">#&gt;   Link                                          LINEAR</span></span>
-<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a><span class="co">#&gt;                                                       </span></span>
-<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a><span class="co">#&gt;   Number of observations                          5000</span></span>
-<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a><span class="co">#&gt;   Number of iterations                               3</span></span>
-<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a><span class="co">#&gt;   Number of latent variables                         4</span></span>
-<span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a><span class="co">#&gt;   Number of observed variables                      18</span></span>
-<span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a><span class="co">#&gt; Fit Measures:</span></span>
-<span id="cb2-18"><a href="#cb2-18" tabindex="-1"></a><span class="co">#&gt;   Chi-Square                                   127.210</span></span>
-<span id="cb2-19"><a href="#cb2-19" tabindex="-1"></a><span class="co">#&gt;   Degrees of Freedom                                49</span></span>
-<span id="cb2-20"><a href="#cb2-20" tabindex="-1"></a><span class="co">#&gt;   SRMR                                           0.008</span></span>
-<span id="cb2-21"><a href="#cb2-21" tabindex="-1"></a><span class="co">#&gt;   RMSEA                                          0.018</span></span>
-<span id="cb2-22"><a href="#cb2-22" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb2-23"><a href="#cb2-23" tabindex="-1"></a><span class="co">#&gt; R-squared (indicators):</span></span>
-<span id="cb2-24"><a href="#cb2-24" tabindex="-1"></a><span class="co">#&gt;   x1                                             0.860</span></span>
-<span id="cb2-25"><a href="#cb2-25" tabindex="-1"></a><span class="co">#&gt;   x2                                             0.683</span></span>
-<span id="cb2-26"><a href="#cb2-26" tabindex="-1"></a><span class="co">#&gt;   x3                                             0.772</span></span>
-<span id="cb2-27"><a href="#cb2-27" tabindex="-1"></a><span class="co">#&gt;   z1                                             0.839</span></span>
-<span id="cb2-28"><a href="#cb2-28" tabindex="-1"></a><span class="co">#&gt;   z2                                             0.694</span></span>
-<span id="cb2-29"><a href="#cb2-29" tabindex="-1"></a><span class="co">#&gt;   z3                                             0.759</span></span>
-<span id="cb2-30"><a href="#cb2-30" tabindex="-1"></a><span class="co">#&gt;   y1                                             0.838</span></span>
-<span id="cb2-31"><a href="#cb2-31" tabindex="-1"></a><span class="co">#&gt;   y2                                             0.726</span></span>
-<span id="cb2-32"><a href="#cb2-32" tabindex="-1"></a><span class="co">#&gt;   y3                                             0.750</span></span>
-<span id="cb2-33"><a href="#cb2-33" tabindex="-1"></a><span class="co">#&gt;   w1                                             0.840</span></span>
-<span id="cb2-34"><a href="#cb2-34" tabindex="-1"></a><span class="co">#&gt;   w2                                             0.695</span></span>
-<span id="cb2-35"><a href="#cb2-35" tabindex="-1"></a><span class="co">#&gt;   w3                                             0.771</span></span>
-<span id="cb2-36"><a href="#cb2-36" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb2-37"><a href="#cb2-37" tabindex="-1"></a><span class="co">#&gt; R-squared (latents):</span></span>
-<span id="cb2-38"><a href="#cb2-38" tabindex="-1"></a><span class="co">#&gt;   Y                                              0.542</span></span>
-<span id="cb2-39"><a href="#cb2-39" tabindex="-1"></a><span class="co">#&gt;   W                                              0.553</span></span>
-<span id="cb2-40"><a href="#cb2-40" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb2-41"><a href="#cb2-41" tabindex="-1"></a><span class="co">#&gt; Latent Variables:</span></span>
-<span id="cb2-42"><a href="#cb2-42" tabindex="-1"></a><span class="co">#&gt;                  Estimate  Std.Error  z.value  P(&gt;|z|)</span></span>
-<span id="cb2-43"><a href="#cb2-43" tabindex="-1"></a><span class="co">#&gt;   X =~          </span></span>
-<span id="cb2-44"><a href="#cb2-44" tabindex="-1"></a><span class="co">#&gt;     x1              0.927      0.009   98.579    0.000</span></span>
-<span id="cb2-45"><a href="#cb2-45" tabindex="-1"></a><span class="co">#&gt;     x2              0.826      0.012   70.255    0.000</span></span>
-<span id="cb2-46"><a href="#cb2-46" tabindex="-1"></a><span class="co">#&gt;     x3              0.879      0.007  128.185    0.000</span></span>
-<span id="cb2-47"><a href="#cb2-47" tabindex="-1"></a><span class="co">#&gt;   Z =~          </span></span>
-<span id="cb2-48"><a href="#cb2-48" tabindex="-1"></a><span class="co">#&gt;     z1              0.916      0.010   88.526    0.000</span></span>
-<span id="cb2-49"><a href="#cb2-49" tabindex="-1"></a><span class="co">#&gt;     z2              0.833      0.013   65.224    0.000</span></span>
-<span id="cb2-50"><a href="#cb2-50" tabindex="-1"></a><span class="co">#&gt;     z3              0.871      0.011   82.705    0.000</span></span>
-<span id="cb2-51"><a href="#cb2-51" tabindex="-1"></a><span class="co">#&gt;   Y =~          </span></span>
-<span id="cb2-52"><a href="#cb2-52" tabindex="-1"></a><span class="co">#&gt;     y1              0.915      0.010   94.080    0.000</span></span>
-<span id="cb2-53"><a href="#cb2-53" tabindex="-1"></a><span class="co">#&gt;     y2              0.852      0.013   65.821    0.000</span></span>
-<span id="cb2-54"><a href="#cb2-54" tabindex="-1"></a><span class="co">#&gt;     y3              0.866      0.012   69.595    0.000</span></span>
-<span id="cb2-55"><a href="#cb2-55" tabindex="-1"></a><span class="co">#&gt;   W =~          </span></span>
-<span id="cb2-56"><a href="#cb2-56" tabindex="-1"></a><span class="co">#&gt;     w1              0.916      0.010   88.332    0.000</span></span>
-<span id="cb2-57"><a href="#cb2-57" tabindex="-1"></a><span class="co">#&gt;     w2              0.834      0.013   66.117    0.000</span></span>
-<span id="cb2-58"><a href="#cb2-58" tabindex="-1"></a><span class="co">#&gt;     w3              0.878      0.014   60.905    0.000</span></span>
-<span id="cb2-59"><a href="#cb2-59" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb2-60"><a href="#cb2-60" tabindex="-1"></a><span class="co">#&gt; Regressions:</span></span>
-<span id="cb2-61"><a href="#cb2-61" tabindex="-1"></a><span class="co">#&gt;                  Estimate  Std.Error  z.value  P(&gt;|z|)</span></span>
-<span id="cb2-62"><a href="#cb2-62" tabindex="-1"></a><span class="co">#&gt;   Y ~           </span></span>
-<span id="cb2-63"><a href="#cb2-63" tabindex="-1"></a><span class="co">#&gt;     X               0.293      0.020   14.518    0.000</span></span>
-<span id="cb2-64"><a href="#cb2-64" tabindex="-1"></a><span class="co">#&gt;     Z               0.444      0.043   10.358    0.000</span></span>
-<span id="cb2-65"><a href="#cb2-65" tabindex="-1"></a><span class="co">#&gt;   W ~           </span></span>
-<span id="cb2-66"><a href="#cb2-66" tabindex="-1"></a><span class="co">#&gt;     X               0.393      0.039   10.027    0.000</span></span>
-<span id="cb2-67"><a href="#cb2-67" tabindex="-1"></a><span class="co">#&gt;     Z               0.248      0.056    4.425    0.000</span></span>
-<span id="cb2-68"><a href="#cb2-68" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb2-69"><a href="#cb2-69" tabindex="-1"></a><span class="co">#&gt; Intercepts:</span></span>
-<span id="cb2-70"><a href="#cb2-70" tabindex="-1"></a><span class="co">#&gt;                  Estimate  Std.Error  z.value  P(&gt;|z|)</span></span>
-<span id="cb2-71"><a href="#cb2-71" tabindex="-1"></a><span class="co">#&gt;    .Y               0.010      0.035    0.280    0.779</span></span>
-<span id="cb2-72"><a href="#cb2-72" tabindex="-1"></a><span class="co">#&gt;    .W               0.010      0.032    0.310    0.757</span></span>
-<span id="cb2-73"><a href="#cb2-73" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb2-74"><a href="#cb2-74" tabindex="-1"></a><span class="co">#&gt; Covariances:</span></span>
-<span id="cb2-75"><a href="#cb2-75" tabindex="-1"></a><span class="co">#&gt;                  Estimate  Std.Error  z.value  P(&gt;|z|)</span></span>
-<span id="cb2-76"><a href="#cb2-76" tabindex="-1"></a><span class="co">#&gt;   X ~~          </span></span>
-<span id="cb2-77"><a href="#cb2-77" tabindex="-1"></a><span class="co">#&gt;     Z               0.175      0.011   15.874    0.000</span></span>
-<span id="cb2-78"><a href="#cb2-78" tabindex="-1"></a><span class="co">#&gt;   Y~X ~~        </span></span>
-<span id="cb2-79"><a href="#cb2-79" tabindex="-1"></a><span class="co">#&gt;     Y~1            -0.004      0.006   -0.622    0.534</span></span>
-<span id="cb2-80"><a href="#cb2-80" tabindex="-1"></a><span class="co">#&gt;   Y~Z ~~        </span></span>
-<span id="cb2-81"><a href="#cb2-81" tabindex="-1"></a><span class="co">#&gt;     Y~1            -0.025      0.014   -1.822    0.068</span></span>
-<span id="cb2-82"><a href="#cb2-82" tabindex="-1"></a><span class="co">#&gt;     Y~X             0.012      0.008    1.590    0.112</span></span>
-<span id="cb2-83"><a href="#cb2-83" tabindex="-1"></a><span class="co">#&gt;   W~X ~~        </span></span>
-<span id="cb2-84"><a href="#cb2-84" tabindex="-1"></a><span class="co">#&gt;     W~1             0.003      0.011    0.281    0.779</span></span>
-<span id="cb2-85"><a href="#cb2-85" tabindex="-1"></a><span class="co">#&gt;   W~Z ~~        </span></span>
-<span id="cb2-86"><a href="#cb2-86" tabindex="-1"></a><span class="co">#&gt;     W~1             0.009      0.011    0.850    0.395</span></span>
-<span id="cb2-87"><a href="#cb2-87" tabindex="-1"></a><span class="co">#&gt;     W~X             0.013      0.014    0.982    0.326</span></span>
-<span id="cb2-88"><a href="#cb2-88" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb2-89"><a href="#cb2-89" tabindex="-1"></a><span class="co">#&gt; Variances:</span></span>
-<span id="cb2-90"><a href="#cb2-90" tabindex="-1"></a><span class="co">#&gt;                  Estimate  Std.Error  z.value  P(&gt;|z|)</span></span>
-<span id="cb2-91"><a href="#cb2-91" tabindex="-1"></a><span class="co">#&gt;     X               1.000                             </span></span>
-<span id="cb2-92"><a href="#cb2-92" tabindex="-1"></a><span class="co">#&gt;     Z               1.000                             </span></span>
-<span id="cb2-93"><a href="#cb2-93" tabindex="-1"></a><span class="co">#&gt;    .Y               0.458      0.049    9.391    0.000</span></span>
-<span id="cb2-94"><a href="#cb2-94" tabindex="-1"></a><span class="co">#&gt;    .W               0.447      0.062    7.164    0.000</span></span>
-<span id="cb2-95"><a href="#cb2-95" tabindex="-1"></a><span class="co">#&gt;    .x1              0.140      0.017    8.027    0.000</span></span>
-<span id="cb2-96"><a href="#cb2-96" tabindex="-1"></a><span class="co">#&gt;    .x2              0.317      0.019   16.312    0.000</span></span>
-<span id="cb2-97"><a href="#cb2-97" tabindex="-1"></a><span class="co">#&gt;    .x3              0.228      0.012   18.886    0.000</span></span>
-<span id="cb2-98"><a href="#cb2-98" tabindex="-1"></a><span class="co">#&gt;    .z1              0.161      0.019    8.521    0.000</span></span>
-<span id="cb2-99"><a href="#cb2-99" tabindex="-1"></a><span class="co">#&gt;    .z2              0.306      0.021   14.291    0.000</span></span>
-<span id="cb2-100"><a href="#cb2-100" tabindex="-1"></a><span class="co">#&gt;    .z3              0.241      0.018   13.223    0.000</span></span>
-<span id="cb2-101"><a href="#cb2-101" tabindex="-1"></a><span class="co">#&gt;    .y1              0.162      0.018    9.154    0.000</span></span>
-<span id="cb2-102"><a href="#cb2-102" tabindex="-1"></a><span class="co">#&gt;    .y2              0.274      0.022   12.516    0.000</span></span>
-<span id="cb2-103"><a href="#cb2-103" tabindex="-1"></a><span class="co">#&gt;    .y3              0.250      0.021   11.645    0.000</span></span>
-<span id="cb2-104"><a href="#cb2-104" tabindex="-1"></a><span class="co">#&gt;    .w1              0.160      0.019    8.444    0.000</span></span>
-<span id="cb2-105"><a href="#cb2-105" tabindex="-1"></a><span class="co">#&gt;    .w2              0.305      0.021   14.430    0.000</span></span>
-<span id="cb2-106"><a href="#cb2-106" tabindex="-1"></a><span class="co">#&gt;    .w3              0.229      0.025    9.110    0.000</span></span>
-<span id="cb2-107"><a href="#cb2-107" tabindex="-1"></a><span class="co">#&gt;     Y~1             0.086      0.019    4.425    0.000</span></span>
-<span id="cb2-108"><a href="#cb2-108" tabindex="-1"></a><span class="co">#&gt;     Y~X             0.018      0.006    3.141    0.002</span></span>
-<span id="cb2-109"><a href="#cb2-109" tabindex="-1"></a><span class="co">#&gt;     Y~Z             0.105      0.019    5.433    0.000</span></span>
-<span id="cb2-110"><a href="#cb2-110" tabindex="-1"></a><span class="co">#&gt;     W~1             0.059      0.013    4.684    0.000</span></span>
-<span id="cb2-111"><a href="#cb2-111" tabindex="-1"></a><span class="co">#&gt;     W~X             0.095      0.016    5.760    0.000</span></span>
-<span id="cb2-112"><a href="#cb2-112" tabindex="-1"></a><span class="co">#&gt;     W~Z             0.144      0.025    5.831    0.000</span></span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>fit_slopes_cont <span class="ot">&lt;-</span> <span class="fu">pls</span>(</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  slopes_model,</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">data      =</span> randomSlopes,</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">bootstrap =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">boot.R    =</span> <span class="dv">50</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(fit_slopes_cont)</span></code></pre></div>
 </div>
 <div id="ordered-indicators" class="section level3">
 <h3>Ordered Indicators</h3>
-<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>fit_slopes_ord <span class="ot">&lt;-</span> <span class="fu">pls</span>(</span>
-<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>  slopes_model,</span>
-<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>  <span class="at">data      =</span> randomSlopesOrdered,</span>
-<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>  <span class="at">bootstrap =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>  <span class="at">boot.R    =</span> <span class="dv">50</span>,</span>
-<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>  <span class="at">ordered   =</span> <span class="fu">colnames</span>(randomSlopesOrdered) <span class="co"># explicitly specify variables as ordered</span></span>
-<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>)</span>
-<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a><span class="fu">summary</span>(fit_slopes_ord)</span>
-<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a><span class="co">#&gt; plssem (0.1.2) ended normally after 3 iterations</span></span>
-<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a><span class="co">#&gt;   Estimator                                OrdPLSc-MLM</span></span>
-<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a><span class="co">#&gt;   Link                                          PROBIT</span></span>
-<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a><span class="co">#&gt;                                                       </span></span>
-<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a><span class="co">#&gt;   Number of observations                          5000</span></span>
-<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a><span class="co">#&gt;   Number of iterations                               3</span></span>
-<span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a><span class="co">#&gt;   Number of latent variables                         4</span></span>
-<span id="cb3-16"><a href="#cb3-16" tabindex="-1"></a><span class="co">#&gt;   Number of observed variables                      18</span></span>
-<span id="cb3-17"><a href="#cb3-17" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb3-18"><a href="#cb3-18" tabindex="-1"></a><span class="co">#&gt; Fit Measures:</span></span>
-<span id="cb3-19"><a href="#cb3-19" tabindex="-1"></a><span class="co">#&gt;   Chi-Square                                   263.372</span></span>
-<span id="cb3-20"><a href="#cb3-20" tabindex="-1"></a><span class="co">#&gt;   Degrees of Freedom                                49</span></span>
-<span id="cb3-21"><a href="#cb3-21" tabindex="-1"></a><span class="co">#&gt;   SRMR                                           0.010</span></span>
-<span id="cb3-22"><a href="#cb3-22" tabindex="-1"></a><span class="co">#&gt;   RMSEA                                          0.030</span></span>
-<span id="cb3-23"><a href="#cb3-23" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb3-24"><a href="#cb3-24" tabindex="-1"></a><span class="co">#&gt; R-squared (indicators):</span></span>
-<span id="cb3-25"><a href="#cb3-25" tabindex="-1"></a><span class="co">#&gt;   x1                                             0.870</span></span>
-<span id="cb3-26"><a href="#cb3-26" tabindex="-1"></a><span class="co">#&gt;   x2                                             0.669</span></span>
-<span id="cb3-27"><a href="#cb3-27" tabindex="-1"></a><span class="co">#&gt;   x3                                             0.789</span></span>
-<span id="cb3-28"><a href="#cb3-28" tabindex="-1"></a><span class="co">#&gt;   z1                                             0.841</span></span>
-<span id="cb3-29"><a href="#cb3-29" tabindex="-1"></a><span class="co">#&gt;   z2                                             0.714</span></span>
-<span id="cb3-30"><a href="#cb3-30" tabindex="-1"></a><span class="co">#&gt;   z3                                             0.758</span></span>
-<span id="cb3-31"><a href="#cb3-31" tabindex="-1"></a><span class="co">#&gt;   y1                                             0.844</span></span>
-<span id="cb3-32"><a href="#cb3-32" tabindex="-1"></a><span class="co">#&gt;   y2                                             0.711</span></span>
-<span id="cb3-33"><a href="#cb3-33" tabindex="-1"></a><span class="co">#&gt;   y3                                             0.754</span></span>
-<span id="cb3-34"><a href="#cb3-34" tabindex="-1"></a><span class="co">#&gt;   w1                                             0.835</span></span>
-<span id="cb3-35"><a href="#cb3-35" tabindex="-1"></a><span class="co">#&gt;   w2                                             0.681</span></span>
-<span id="cb3-36"><a href="#cb3-36" tabindex="-1"></a><span class="co">#&gt;   w3                                             0.785</span></span>
-<span id="cb3-37"><a href="#cb3-37" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb3-38"><a href="#cb3-38" tabindex="-1"></a><span class="co">#&gt; R-squared (latents):</span></span>
-<span id="cb3-39"><a href="#cb3-39" tabindex="-1"></a><span class="co">#&gt;   Y                                              0.535</span></span>
-<span id="cb3-40"><a href="#cb3-40" tabindex="-1"></a><span class="co">#&gt;   W                                              0.547</span></span>
-<span id="cb3-41"><a href="#cb3-41" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb3-42"><a href="#cb3-42" tabindex="-1"></a><span class="co">#&gt; Latent Variables:</span></span>
-<span id="cb3-43"><a href="#cb3-43" tabindex="-1"></a><span class="co">#&gt;                  Estimate  Std.Error  z.value  P(&gt;|z|)</span></span>
-<span id="cb3-44"><a href="#cb3-44" tabindex="-1"></a><span class="co">#&gt;   X =~          </span></span>
-<span id="cb3-45"><a href="#cb3-45" tabindex="-1"></a><span class="co">#&gt;     x1              0.933      0.013   72.758    0.000</span></span>
-<span id="cb3-46"><a href="#cb3-46" tabindex="-1"></a><span class="co">#&gt;     x2              0.818      0.012   70.376    0.000</span></span>
-<span id="cb3-47"><a href="#cb3-47" tabindex="-1"></a><span class="co">#&gt;     x3              0.888      0.012   71.849    0.000</span></span>
-<span id="cb3-48"><a href="#cb3-48" tabindex="-1"></a><span class="co">#&gt;   Z =~          </span></span>
-<span id="cb3-49"><a href="#cb3-49" tabindex="-1"></a><span class="co">#&gt;     z1              0.917      0.011   82.699    0.000</span></span>
-<span id="cb3-50"><a href="#cb3-50" tabindex="-1"></a><span class="co">#&gt;     z2              0.845      0.013   63.888    0.000</span></span>
-<span id="cb3-51"><a href="#cb3-51" tabindex="-1"></a><span class="co">#&gt;     z3              0.871      0.011   76.727    0.000</span></span>
-<span id="cb3-52"><a href="#cb3-52" tabindex="-1"></a><span class="co">#&gt;   Y =~          </span></span>
-<span id="cb3-53"><a href="#cb3-53" tabindex="-1"></a><span class="co">#&gt;     y1              0.918      0.011   84.803    0.000</span></span>
-<span id="cb3-54"><a href="#cb3-54" tabindex="-1"></a><span class="co">#&gt;     y2              0.843      0.015   57.262    0.000</span></span>
-<span id="cb3-55"><a href="#cb3-55" tabindex="-1"></a><span class="co">#&gt;     y3              0.869      0.013   64.376    0.000</span></span>
-<span id="cb3-56"><a href="#cb3-56" tabindex="-1"></a><span class="co">#&gt;   W =~          </span></span>
-<span id="cb3-57"><a href="#cb3-57" tabindex="-1"></a><span class="co">#&gt;     w1              0.914      0.012   78.395    0.000</span></span>
-<span id="cb3-58"><a href="#cb3-58" tabindex="-1"></a><span class="co">#&gt;     w2              0.825      0.019   43.281    0.000</span></span>
-<span id="cb3-59"><a href="#cb3-59" tabindex="-1"></a><span class="co">#&gt;     w3              0.886      0.016   56.650    0.000</span></span>
-<span id="cb3-60"><a href="#cb3-60" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb3-61"><a href="#cb3-61" tabindex="-1"></a><span class="co">#&gt; Regressions:</span></span>
-<span id="cb3-62"><a href="#cb3-62" tabindex="-1"></a><span class="co">#&gt;                  Estimate  Std.Error  z.value  P(&gt;|z|)</span></span>
-<span id="cb3-63"><a href="#cb3-63" tabindex="-1"></a><span class="co">#&gt;   Y ~           </span></span>
-<span id="cb3-64"><a href="#cb3-64" tabindex="-1"></a><span class="co">#&gt;     X               0.290      0.023   12.752    0.000</span></span>
-<span id="cb3-65"><a href="#cb3-65" tabindex="-1"></a><span class="co">#&gt;     Z               0.451      0.047    9.671    0.000</span></span>
-<span id="cb3-66"><a href="#cb3-66" tabindex="-1"></a><span class="co">#&gt;   W ~           </span></span>
-<span id="cb3-67"><a href="#cb3-67" tabindex="-1"></a><span class="co">#&gt;     X               0.391      0.042    9.244    0.000</span></span>
-<span id="cb3-68"><a href="#cb3-68" tabindex="-1"></a><span class="co">#&gt;     Z               0.245      0.059    4.138    0.000</span></span>
-<span id="cb3-69"><a href="#cb3-69" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb3-70"><a href="#cb3-70" tabindex="-1"></a><span class="co">#&gt; Intercepts:</span></span>
-<span id="cb3-71"><a href="#cb3-71" tabindex="-1"></a><span class="co">#&gt;                  Estimate  Std.Error  z.value  P(&gt;|z|)</span></span>
-<span id="cb3-72"><a href="#cb3-72" tabindex="-1"></a><span class="co">#&gt;    .Y               0.011      0.040    0.276    0.783</span></span>
-<span id="cb3-73"><a href="#cb3-73" tabindex="-1"></a><span class="co">#&gt;    .W               0.009      0.033    0.268    0.788</span></span>
-<span id="cb3-74"><a href="#cb3-74" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb3-75"><a href="#cb3-75" tabindex="-1"></a><span class="co">#&gt; Covariances:</span></span>
-<span id="cb3-76"><a href="#cb3-76" tabindex="-1"></a><span class="co">#&gt;                  Estimate  Std.Error  z.value  P(&gt;|z|)</span></span>
-<span id="cb3-77"><a href="#cb3-77" tabindex="-1"></a><span class="co">#&gt;   X ~~          </span></span>
-<span id="cb3-78"><a href="#cb3-78" tabindex="-1"></a><span class="co">#&gt;     Z               0.168      0.013   12.905    0.000</span></span>
-<span id="cb3-79"><a href="#cb3-79" tabindex="-1"></a><span class="co">#&gt;   Y~X ~~        </span></span>
-<span id="cb3-80"><a href="#cb3-80" tabindex="-1"></a><span class="co">#&gt;     Y~1            -0.006      0.005   -1.242    0.214</span></span>
-<span id="cb3-81"><a href="#cb3-81" tabindex="-1"></a><span class="co">#&gt;   Y~Z ~~        </span></span>
-<span id="cb3-82"><a href="#cb3-82" tabindex="-1"></a><span class="co">#&gt;     Y~1            -0.024      0.013   -1.829    0.067</span></span>
-<span id="cb3-83"><a href="#cb3-83" tabindex="-1"></a><span class="co">#&gt;     Y~X             0.012      0.008    1.524    0.128</span></span>
-<span id="cb3-84"><a href="#cb3-84" tabindex="-1"></a><span class="co">#&gt;   W~X ~~        </span></span>
-<span id="cb3-85"><a href="#cb3-85" tabindex="-1"></a><span class="co">#&gt;     W~1             0.004      0.011    0.323    0.746</span></span>
-<span id="cb3-86"><a href="#cb3-86" tabindex="-1"></a><span class="co">#&gt;   W~Z ~~        </span></span>
-<span id="cb3-87"><a href="#cb3-87" tabindex="-1"></a><span class="co">#&gt;     W~1             0.009      0.011    0.831    0.406</span></span>
-<span id="cb3-88"><a href="#cb3-88" tabindex="-1"></a><span class="co">#&gt;     W~X             0.016      0.012    1.376    0.169</span></span>
-<span id="cb3-89"><a href="#cb3-89" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb3-90"><a href="#cb3-90" tabindex="-1"></a><span class="co">#&gt; Variances:</span></span>
-<span id="cb3-91"><a href="#cb3-91" tabindex="-1"></a><span class="co">#&gt;                  Estimate  Std.Error  z.value  P(&gt;|z|)</span></span>
-<span id="cb3-92"><a href="#cb3-92" tabindex="-1"></a><span class="co">#&gt;     X               1.000                             </span></span>
-<span id="cb3-93"><a href="#cb3-93" tabindex="-1"></a><span class="co">#&gt;     Z               1.000                             </span></span>
-<span id="cb3-94"><a href="#cb3-94" tabindex="-1"></a><span class="co">#&gt;    .Y               0.465      0.056    8.339    0.000</span></span>
-<span id="cb3-95"><a href="#cb3-95" tabindex="-1"></a><span class="co">#&gt;    .W               0.453      0.051    8.799    0.000</span></span>
-<span id="cb3-96"><a href="#cb3-96" tabindex="-1"></a><span class="co">#&gt;    .x1              0.130      0.024    5.440    0.000</span></span>
-<span id="cb3-97"><a href="#cb3-97" tabindex="-1"></a><span class="co">#&gt;    .x2              0.331      0.019   17.413    0.000</span></span>
-<span id="cb3-98"><a href="#cb3-98" tabindex="-1"></a><span class="co">#&gt;    .x3              0.211      0.022    9.636    0.000</span></span>
-<span id="cb3-99"><a href="#cb3-99" tabindex="-1"></a><span class="co">#&gt;    .z1              0.159      0.020    7.758    0.000</span></span>
-<span id="cb3-100"><a href="#cb3-100" tabindex="-1"></a><span class="co">#&gt;    .z2              0.286      0.022   12.801    0.000</span></span>
-<span id="cb3-101"><a href="#cb3-101" tabindex="-1"></a><span class="co">#&gt;    .z3              0.242      0.020   12.299    0.000</span></span>
-<span id="cb3-102"><a href="#cb3-102" tabindex="-1"></a><span class="co">#&gt;    .y1              0.156      0.020    7.856    0.000</span></span>
-<span id="cb3-103"><a href="#cb3-103" tabindex="-1"></a><span class="co">#&gt;    .y2              0.289      0.025   11.690    0.000</span></span>
-<span id="cb3-104"><a href="#cb3-104" tabindex="-1"></a><span class="co">#&gt;    .y3              0.246      0.023   10.494    0.000</span></span>
-<span id="cb3-105"><a href="#cb3-105" tabindex="-1"></a><span class="co">#&gt;    .w1              0.165      0.021    7.773    0.000</span></span>
-<span id="cb3-106"><a href="#cb3-106" tabindex="-1"></a><span class="co">#&gt;    .w2              0.319      0.031   10.229    0.000</span></span>
-<span id="cb3-107"><a href="#cb3-107" tabindex="-1"></a><span class="co">#&gt;    .w3              0.215      0.028    7.777    0.000</span></span>
-<span id="cb3-108"><a href="#cb3-108" tabindex="-1"></a><span class="co">#&gt;     Y~1             0.080      0.017    4.673    0.000</span></span>
-<span id="cb3-109"><a href="#cb3-109" tabindex="-1"></a><span class="co">#&gt;     Y~X             0.018      0.005    3.508    0.000</span></span>
-<span id="cb3-110"><a href="#cb3-110" tabindex="-1"></a><span class="co">#&gt;     Y~Z             0.102      0.015    6.737    0.000</span></span>
-<span id="cb3-111"><a href="#cb3-111" tabindex="-1"></a><span class="co">#&gt;     W~1             0.055      0.015    3.644    0.000</span></span>
-<span id="cb3-112"><a href="#cb3-112" tabindex="-1"></a><span class="co">#&gt;     W~X             0.099      0.018    5.415    0.000</span></span>
-<span id="cb3-113"><a href="#cb3-113" tabindex="-1"></a><span class="co">#&gt;     W~Z             0.142      0.028    5.054    0.000</span></span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>fit_slopes_ord <span class="ot">&lt;-</span> <span class="fu">pls</span>(</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  slopes_model,</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">data      =</span> randomSlopesOrdered,</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">bootstrap =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">boot.R    =</span> <span class="dv">50</span>,</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">ordered   =</span> <span class="fu">colnames</span>(randomSlopesOrdered) <span class="co"># explicitly specify variables as ordered</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(fit_slopes_ord)</span></code></pre></div>
 </div>
 </div>
 <div id="random-intercepts-model" class="section level2">
 <h2>Random Intercepts Model</h2>
-<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>intercepts_model <span class="ot">&lt;-</span> <span class="st">&#39;</span></span>
-<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="st">  f =~ y1 + y2 + y3</span></span>
-<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="st">  f ~ x1 + x2 + x3 + w1 + w2 + (1 | cluster)</span></span>
-<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="st">&#39;</span></span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>intercepts_model <span class="ot">&lt;-</span> <span class="st">&#39;</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="st">  f =~ y1 + y2 + y3</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="st">  f ~ x1 + x2 + x3 + w1 + w2 + (1 | cluster)</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="st">&#39;</span></span></code></pre></div>
 <div id="continuous-indicators-1" class="section level3">
 <h3>Continuous Indicators</h3>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>fit_intercepts_cont <span class="ot">&lt;-</span> <span class="fu">pls</span>(</span>
-<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>  intercepts_model,</span>
-<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>  <span class="at">data      =</span> randomIntercepts,</span>
-<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>  <span class="at">bootstrap =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>  <span class="at">boot.R    =</span> <span class="dv">50</span></span>
-<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>)</span>
-<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a><span class="fu">summary</span>(fit_intercepts_cont)</span>
-<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a><span class="co">#&gt; plssem (0.1.2) ended normally after 2 iterations</span></span>
-<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a><span class="co">#&gt;   Estimator                                   PLSc-MLM</span></span>
-<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a><span class="co">#&gt;   Link                                          LINEAR</span></span>
-<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a><span class="co">#&gt;                                                       </span></span>
-<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a><span class="co">#&gt;   Number of observations                         10000</span></span>
-<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a><span class="co">#&gt;   Number of iterations                               2</span></span>
-<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a><span class="co">#&gt;   Number of latent variables                         1</span></span>
-<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a><span class="co">#&gt;   Number of observed variables                       9</span></span>
-<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb5-17"><a href="#cb5-17" tabindex="-1"></a><span class="co">#&gt; Fit Measures:</span></span>
-<span id="cb5-18"><a href="#cb5-18" tabindex="-1"></a><span class="co">#&gt;   Chi-Square                                    24.372</span></span>
-<span id="cb5-19"><a href="#cb5-19" tabindex="-1"></a><span class="co">#&gt;   Degrees of Freedom                                10</span></span>
-<span id="cb5-20"><a href="#cb5-20" tabindex="-1"></a><span class="co">#&gt;   SRMR                                           0.003</span></span>
-<span id="cb5-21"><a href="#cb5-21" tabindex="-1"></a><span class="co">#&gt;   RMSEA                                          0.012</span></span>
-<span id="cb5-22"><a href="#cb5-22" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb5-23"><a href="#cb5-23" tabindex="-1"></a><span class="co">#&gt; R-squared (indicators):</span></span>
-<span id="cb5-24"><a href="#cb5-24" tabindex="-1"></a><span class="co">#&gt;   y1                                             0.891</span></span>
-<span id="cb5-25"><a href="#cb5-25" tabindex="-1"></a><span class="co">#&gt;   y2                                             0.785</span></span>
-<span id="cb5-26"><a href="#cb5-26" tabindex="-1"></a><span class="co">#&gt;   y3                                             0.814</span></span>
-<span id="cb5-27"><a href="#cb5-27" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb5-28"><a href="#cb5-28" tabindex="-1"></a><span class="co">#&gt; R-squared (latents):</span></span>
-<span id="cb5-29"><a href="#cb5-29" tabindex="-1"></a><span class="co">#&gt;   f                                              0.744</span></span>
-<span id="cb5-30"><a href="#cb5-30" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb5-31"><a href="#cb5-31" tabindex="-1"></a><span class="co">#&gt; Latent Variables:</span></span>
-<span id="cb5-32"><a href="#cb5-32" tabindex="-1"></a><span class="co">#&gt;                  Estimate  Std.Error  z.value  P(&gt;|z|)</span></span>
-<span id="cb5-33"><a href="#cb5-33" tabindex="-1"></a><span class="co">#&gt;   f =~          </span></span>
-<span id="cb5-34"><a href="#cb5-34" tabindex="-1"></a><span class="co">#&gt;     y1              0.944      0.007  136.498    0.000</span></span>
-<span id="cb5-35"><a href="#cb5-35" tabindex="-1"></a><span class="co">#&gt;     y2              0.886      0.009   93.458    0.000</span></span>
-<span id="cb5-36"><a href="#cb5-36" tabindex="-1"></a><span class="co">#&gt;     y3              0.902      0.008  114.737    0.000</span></span>
-<span id="cb5-37"><a href="#cb5-37" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb5-38"><a href="#cb5-38" tabindex="-1"></a><span class="co">#&gt; Regressions:</span></span>
-<span id="cb5-39"><a href="#cb5-39" tabindex="-1"></a><span class="co">#&gt;                  Estimate  Std.Error  z.value  P(&gt;|z|)</span></span>
-<span id="cb5-40"><a href="#cb5-40" tabindex="-1"></a><span class="co">#&gt;   f ~           </span></span>
-<span id="cb5-41"><a href="#cb5-41" tabindex="-1"></a><span class="co">#&gt;     x1              0.238      0.006   42.342    0.000</span></span>
-<span id="cb5-42"><a href="#cb5-42" tabindex="-1"></a><span class="co">#&gt;     x2              0.162      0.005   31.859    0.000</span></span>
-<span id="cb5-43"><a href="#cb5-43" tabindex="-1"></a><span class="co">#&gt;     x3              0.077      0.005   14.336    0.000</span></span>
-<span id="cb5-44"><a href="#cb5-44" tabindex="-1"></a><span class="co">#&gt;     w1              0.128      0.039    3.318    0.001</span></span>
-<span id="cb5-45"><a href="#cb5-45" tabindex="-1"></a><span class="co">#&gt;     w2              0.091      0.041    2.232    0.026</span></span>
-<span id="cb5-46"><a href="#cb5-46" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb5-47"><a href="#cb5-47" tabindex="-1"></a><span class="co">#&gt; Intercepts:</span></span>
-<span id="cb5-48"><a href="#cb5-48" tabindex="-1"></a><span class="co">#&gt;                  Estimate  Std.Error  z.value  P(&gt;|z|)</span></span>
-<span id="cb5-49"><a href="#cb5-49" tabindex="-1"></a><span class="co">#&gt;    .f              -0.013      0.035   -0.356    0.722</span></span>
-<span id="cb5-50"><a href="#cb5-50" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb5-51"><a href="#cb5-51" tabindex="-1"></a><span class="co">#&gt; Covariances:</span></span>
-<span id="cb5-52"><a href="#cb5-52" tabindex="-1"></a><span class="co">#&gt;                  Estimate  Std.Error  z.value  P(&gt;|z|)</span></span>
-<span id="cb5-53"><a href="#cb5-53" tabindex="-1"></a><span class="co">#&gt;   x1 ~~         </span></span>
-<span id="cb5-54"><a href="#cb5-54" tabindex="-1"></a><span class="co">#&gt;     x2              0.104      0.010   10.850    0.000</span></span>
-<span id="cb5-55"><a href="#cb5-55" tabindex="-1"></a><span class="co">#&gt;     x3              0.004      0.010    0.444    0.657</span></span>
-<span id="cb5-56"><a href="#cb5-56" tabindex="-1"></a><span class="co">#&gt;     w1              0.000                             </span></span>
-<span id="cb5-57"><a href="#cb5-57" tabindex="-1"></a><span class="co">#&gt;     w2              0.000                             </span></span>
-<span id="cb5-58"><a href="#cb5-58" tabindex="-1"></a><span class="co">#&gt;   x2 ~~         </span></span>
-<span id="cb5-59"><a href="#cb5-59" tabindex="-1"></a><span class="co">#&gt;     x3              0.097      0.014    7.083    0.000</span></span>
-<span id="cb5-60"><a href="#cb5-60" tabindex="-1"></a><span class="co">#&gt;     w1              0.000                             </span></span>
-<span id="cb5-61"><a href="#cb5-61" tabindex="-1"></a><span class="co">#&gt;     w2              0.000                             </span></span>
-<span id="cb5-62"><a href="#cb5-62" tabindex="-1"></a><span class="co">#&gt;   x3 ~~         </span></span>
-<span id="cb5-63"><a href="#cb5-63" tabindex="-1"></a><span class="co">#&gt;     w1              0.000                             </span></span>
-<span id="cb5-64"><a href="#cb5-64" tabindex="-1"></a><span class="co">#&gt;     w2              0.000                             </span></span>
-<span id="cb5-65"><a href="#cb5-65" tabindex="-1"></a><span class="co">#&gt;   w1 ~~         </span></span>
-<span id="cb5-66"><a href="#cb5-66" tabindex="-1"></a><span class="co">#&gt;     w2             -0.041      0.048   -0.857    0.392</span></span>
-<span id="cb5-67"><a href="#cb5-67" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb5-68"><a href="#cb5-68" tabindex="-1"></a><span class="co">#&gt; Variances:</span></span>
-<span id="cb5-69"><a href="#cb5-69" tabindex="-1"></a><span class="co">#&gt;                  Estimate  Std.Error  z.value  P(&gt;|z|)</span></span>
-<span id="cb5-70"><a href="#cb5-70" tabindex="-1"></a><span class="co">#&gt;    .f               0.256      0.037    6.994    0.000</span></span>
-<span id="cb5-71"><a href="#cb5-71" tabindex="-1"></a><span class="co">#&gt;     x1              1.000                             </span></span>
-<span id="cb5-72"><a href="#cb5-72" tabindex="-1"></a><span class="co">#&gt;     x2              1.000                             </span></span>
-<span id="cb5-73"><a href="#cb5-73" tabindex="-1"></a><span class="co">#&gt;     x3              1.000                             </span></span>
-<span id="cb5-74"><a href="#cb5-74" tabindex="-1"></a><span class="co">#&gt;     w1              1.000                             </span></span>
-<span id="cb5-75"><a href="#cb5-75" tabindex="-1"></a><span class="co">#&gt;     w2              1.000                             </span></span>
-<span id="cb5-76"><a href="#cb5-76" tabindex="-1"></a><span class="co">#&gt;    .y1              0.109      0.013    8.331    0.000</span></span>
-<span id="cb5-77"><a href="#cb5-77" tabindex="-1"></a><span class="co">#&gt;    .y2              0.215      0.017   12.794    0.000</span></span>
-<span id="cb5-78"><a href="#cb5-78" tabindex="-1"></a><span class="co">#&gt;    .y3              0.186      0.014   13.117    0.000</span></span>
-<span id="cb5-79"><a href="#cb5-79" tabindex="-1"></a><span class="co">#&gt;     f~1             0.621      0.040   15.429    0.000</span></span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>fit_intercepts_cont <span class="ot">&lt;-</span> <span class="fu">pls</span>(</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  intercepts_model,</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">data      =</span> randomIntercepts,</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">bootstrap =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">boot.R    =</span> <span class="dv">50</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(fit_intercepts_cont)</span></code></pre></div>
 </div>
 <div id="ordered-indicators-1" class="section level3">
 <h3>Ordered Indicators</h3>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>fit_intercepts_ord <span class="ot">&lt;-</span> <span class="fu">pls</span>(</span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  intercepts_model,</span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="at">data      =</span> randomInterceptsOrdered,</span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  <span class="at">bootstrap =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>  <span class="at">boot.R    =</span> <span class="dv">50</span>,</span>
-<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>  <span class="at">ordered   =</span> <span class="fu">colnames</span>(randomInterceptsOrdered) <span class="co"># explicitly specify variables as ordered</span></span>
-<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>)</span>
-<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a><span class="fu">summary</span>(fit_intercepts_ord)</span>
-<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a><span class="co">#&gt; plssem (0.1.2) ended normally after 2 iterations</span></span>
-<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a><span class="co">#&gt;   Estimator                                OrdPLSc-MLM</span></span>
-<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a><span class="co">#&gt;   Link                                          PROBIT</span></span>
-<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a><span class="co">#&gt;                                                       </span></span>
-<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a><span class="co">#&gt;   Number of observations                         10000</span></span>
-<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a><span class="co">#&gt;   Number of iterations                               2</span></span>
-<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a><span class="co">#&gt;   Number of latent variables                         1</span></span>
-<span id="cb6-16"><a href="#cb6-16" tabindex="-1"></a><span class="co">#&gt;   Number of observed variables                       9</span></span>
-<span id="cb6-17"><a href="#cb6-17" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb6-18"><a href="#cb6-18" tabindex="-1"></a><span class="co">#&gt; Fit Measures:</span></span>
-<span id="cb6-19"><a href="#cb6-19" tabindex="-1"></a><span class="co">#&gt;   Chi-Square                                    25.508</span></span>
-<span id="cb6-20"><a href="#cb6-20" tabindex="-1"></a><span class="co">#&gt;   Degrees of Freedom                                10</span></span>
-<span id="cb6-21"><a href="#cb6-21" tabindex="-1"></a><span class="co">#&gt;   SRMR                                           0.003</span></span>
-<span id="cb6-22"><a href="#cb6-22" tabindex="-1"></a><span class="co">#&gt;   RMSEA                                          0.012</span></span>
-<span id="cb6-23"><a href="#cb6-23" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb6-24"><a href="#cb6-24" tabindex="-1"></a><span class="co">#&gt; R-squared (indicators):</span></span>
-<span id="cb6-25"><a href="#cb6-25" tabindex="-1"></a><span class="co">#&gt;   y1                                             0.885</span></span>
-<span id="cb6-26"><a href="#cb6-26" tabindex="-1"></a><span class="co">#&gt;   y2                                             0.788</span></span>
-<span id="cb6-27"><a href="#cb6-27" tabindex="-1"></a><span class="co">#&gt;   y3                                             0.809</span></span>
-<span id="cb6-28"><a href="#cb6-28" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb6-29"><a href="#cb6-29" tabindex="-1"></a><span class="co">#&gt; R-squared (latents):</span></span>
-<span id="cb6-30"><a href="#cb6-30" tabindex="-1"></a><span class="co">#&gt;   f                                              0.685</span></span>
-<span id="cb6-31"><a href="#cb6-31" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb6-32"><a href="#cb6-32" tabindex="-1"></a><span class="co">#&gt; Latent Variables:</span></span>
-<span id="cb6-33"><a href="#cb6-33" tabindex="-1"></a><span class="co">#&gt;                  Estimate  Std.Error  z.value  P(&gt;|z|)</span></span>
-<span id="cb6-34"><a href="#cb6-34" tabindex="-1"></a><span class="co">#&gt;   f =~          </span></span>
-<span id="cb6-35"><a href="#cb6-35" tabindex="-1"></a><span class="co">#&gt;     y1              0.941      0.010   90.683    0.000</span></span>
-<span id="cb6-36"><a href="#cb6-36" tabindex="-1"></a><span class="co">#&gt;     y2              0.888      0.014   64.297    0.000</span></span>
-<span id="cb6-37"><a href="#cb6-37" tabindex="-1"></a><span class="co">#&gt;     y3              0.899      0.017   53.861    0.000</span></span>
-<span id="cb6-38"><a href="#cb6-38" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb6-39"><a href="#cb6-39" tabindex="-1"></a><span class="co">#&gt; Regressions:</span></span>
-<span id="cb6-40"><a href="#cb6-40" tabindex="-1"></a><span class="co">#&gt;                  Estimate  Std.Error  z.value  P(&gt;|z|)</span></span>
-<span id="cb6-41"><a href="#cb6-41" tabindex="-1"></a><span class="co">#&gt;   f ~           </span></span>
-<span id="cb6-42"><a href="#cb6-42" tabindex="-1"></a><span class="co">#&gt;     x1              0.234      0.006   37.993    0.000</span></span>
-<span id="cb6-43"><a href="#cb6-43" tabindex="-1"></a><span class="co">#&gt;     x2              0.154      0.005   29.110    0.000</span></span>
-<span id="cb6-44"><a href="#cb6-44" tabindex="-1"></a><span class="co">#&gt;     x3              0.078      0.007   10.795    0.000</span></span>
-<span id="cb6-45"><a href="#cb6-45" tabindex="-1"></a><span class="co">#&gt;     w1              0.118      0.038    3.101    0.002</span></span>
-<span id="cb6-46"><a href="#cb6-46" tabindex="-1"></a><span class="co">#&gt;     w2              0.079      0.045    1.764    0.078</span></span>
-<span id="cb6-47"><a href="#cb6-47" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb6-48"><a href="#cb6-48" tabindex="-1"></a><span class="co">#&gt; Intercepts:</span></span>
-<span id="cb6-49"><a href="#cb6-49" tabindex="-1"></a><span class="co">#&gt;                  Estimate  Std.Error  z.value  P(&gt;|z|)</span></span>
-<span id="cb6-50"><a href="#cb6-50" tabindex="-1"></a><span class="co">#&gt;    .f              -0.011      0.035   -0.331    0.741</span></span>
-<span id="cb6-51"><a href="#cb6-51" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb6-52"><a href="#cb6-52" tabindex="-1"></a><span class="co">#&gt; Covariances:</span></span>
-<span id="cb6-53"><a href="#cb6-53" tabindex="-1"></a><span class="co">#&gt;                  Estimate  Std.Error  z.value  P(&gt;|z|)</span></span>
-<span id="cb6-54"><a href="#cb6-54" tabindex="-1"></a><span class="co">#&gt;   x1 ~~         </span></span>
-<span id="cb6-55"><a href="#cb6-55" tabindex="-1"></a><span class="co">#&gt;     x2              0.110      0.011    9.893    0.000</span></span>
-<span id="cb6-56"><a href="#cb6-56" tabindex="-1"></a><span class="co">#&gt;     x3              0.012      0.011    1.111    0.267</span></span>
-<span id="cb6-57"><a href="#cb6-57" tabindex="-1"></a><span class="co">#&gt;     w1              0.001      0.004    0.208    0.835</span></span>
-<span id="cb6-58"><a href="#cb6-58" tabindex="-1"></a><span class="co">#&gt;     w2              0.001      0.003    0.327    0.743</span></span>
-<span id="cb6-59"><a href="#cb6-59" tabindex="-1"></a><span class="co">#&gt;   x2 ~~         </span></span>
-<span id="cb6-60"><a href="#cb6-60" tabindex="-1"></a><span class="co">#&gt;     x3              0.099      0.012    8.351    0.000</span></span>
-<span id="cb6-61"><a href="#cb6-61" tabindex="-1"></a><span class="co">#&gt;     w1             -0.003      0.003   -1.022    0.307</span></span>
-<span id="cb6-62"><a href="#cb6-62" tabindex="-1"></a><span class="co">#&gt;     w2             -0.001      0.003   -0.425    0.671</span></span>
-<span id="cb6-63"><a href="#cb6-63" tabindex="-1"></a><span class="co">#&gt;   x3 ~~         </span></span>
-<span id="cb6-64"><a href="#cb6-64" tabindex="-1"></a><span class="co">#&gt;     w1             -0.003      0.003   -1.080    0.280</span></span>
-<span id="cb6-65"><a href="#cb6-65" tabindex="-1"></a><span class="co">#&gt;     w2              0.003      0.003    1.002    0.316</span></span>
-<span id="cb6-66"><a href="#cb6-66" tabindex="-1"></a><span class="co">#&gt;   w1 ~~         </span></span>
-<span id="cb6-67"><a href="#cb6-67" tabindex="-1"></a><span class="co">#&gt;     w2             -0.025      0.043   -0.571    0.568</span></span>
-<span id="cb6-68"><a href="#cb6-68" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb6-69"><a href="#cb6-69" tabindex="-1"></a><span class="co">#&gt; Variances:</span></span>
-<span id="cb6-70"><a href="#cb6-70" tabindex="-1"></a><span class="co">#&gt;                  Estimate  Std.Error  z.value  P(&gt;|z|)</span></span>
-<span id="cb6-71"><a href="#cb6-71" tabindex="-1"></a><span class="co">#&gt;    .f               0.315      0.032    9.811    0.000</span></span>
-<span id="cb6-72"><a href="#cb6-72" tabindex="-1"></a><span class="co">#&gt;     x1              1.000                             </span></span>
-<span id="cb6-73"><a href="#cb6-73" tabindex="-1"></a><span class="co">#&gt;     x2              1.000                             </span></span>
-<span id="cb6-74"><a href="#cb6-74" tabindex="-1"></a><span class="co">#&gt;     x3              1.000                             </span></span>
-<span id="cb6-75"><a href="#cb6-75" tabindex="-1"></a><span class="co">#&gt;     w1              1.000                             </span></span>
-<span id="cb6-76"><a href="#cb6-76" tabindex="-1"></a><span class="co">#&gt;     w2              1.000                             </span></span>
-<span id="cb6-77"><a href="#cb6-77" tabindex="-1"></a><span class="co">#&gt;    .y1              0.115      0.019    5.878    0.000</span></span>
-<span id="cb6-78"><a href="#cb6-78" tabindex="-1"></a><span class="co">#&gt;    .y2              0.212      0.025    8.634    0.000</span></span>
-<span id="cb6-79"><a href="#cb6-79" tabindex="-1"></a><span class="co">#&gt;    .y3              0.191      0.030    6.369    0.000</span></span>
-<span id="cb6-80"><a href="#cb6-80" tabindex="-1"></a><span class="co">#&gt;     f~1             0.569      0.034   16.725    0.000</span></span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>fit_intercepts_ord <span class="ot">&lt;-</span> <span class="fu">pls</span>(</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  intercepts_model,</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">data      =</span> randomInterceptsOrdered,</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">bootstrap =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">boot.R    =</span> <span class="dv">50</span>,</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">ordered   =</span> <span class="fu">colnames</span>(randomInterceptsOrdered) <span class="co"># explicitly specify variables as ordered</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(fit_intercepts_ord)</span></code></pre></div>
 </div>
 </div>
 

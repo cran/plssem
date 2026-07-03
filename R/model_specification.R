@@ -1,13 +1,41 @@
 OPERATORS <- c("<~", "~~", "=~", "~1", "~", "|")
 MOPS      <- c("<~", "=~")
+# Operator used to declare a structural variable that has no regression paths,
+# e.g. `x ~ 1`. We never model the mean structure ourselves, so the `~1`
+# operator is free to repurpose for this. It decouples "is a structural node"
+# from the `~~` operator: `~~` now *only* frees a (co)variance among
+# already-declared structural nodes, which (among other things) lets us specify
+# covariances within the measurement model without accidentally promoting
+# indicators to structural variables.
+ADDITIONAL_STRUCT_VAR_OP <- "~1"
 MAT_STRUCT <- matrix(0, nrow = 0, ncol = 0)
 DF_STRUCT  <- data.frame(NULL)
 VEC_STRUCT <- numeric(0)
 
 
-specifyModel <- function(syntax, data, ...) {
-  parTable <- modsem::modsemify(syntax, parentheses.as.string = TRUE)
-  hiOrd    <- getHigherOrderLVs(parTable)
+specifyModel <- function(syntax, data, ..., strict = TRUE) {
+  parTable <- plsParseModelSyntax(syntax)
+
+  if (strict) {
+    # check if we have any user-supplied names which use reserved patterns
+    nm <- union(parTable$lhs, parTable$rhs)
+    hasTmp <- hasTempAffixes(nm)
+
+    pls_stopif(any(hasTmp),
+      "Some variables have reserved keywords/patterns!",
+      "Variables:", paste0(nm[hasTmp], collapse = ", ")
+    )
+
+    # check if we have user specified intercepts (which aren't allowed)
+    hasIntr <- parTable$op == "~1"
+    intrPar <- paste0(parTable$lhs[hasIntr], parTable$op[hasIntr])
+    pls_stopif(any(hasIntr),
+      "Estimation of intercepts is not available!",
+      "Intercepts:", paste0(intrPar, collapse = ", ")
+    )
+  }
+
+  hiOrd <- getHigherOrderLVs(parTable)
   specifyModelParTable(parTable = parTable, data = data, higherOrderLVs = hiOrd, ...)
 }
 
@@ -47,37 +75,40 @@ specifyModelParTable <- function(parTable, data, higherOrderLVs = NULL, ...) {
 
 specifySubModel <- function(parTable,
                             data,
-                            is.lower.order      = FALSE,
-                            consistent          = TRUE,
-                            missing             = "listwise",
-                            standardize         = TRUE,
-                            ordered             = NULL,
-                            probit              = NULL,
-                            mcpls               = NULL,
-                            mc.fast.lmer        = NULL,
-                            tolerance           = 1e-5,
-                            max.iter.0_5        = 100,
-                            mc.max.iter         = 250,
-                            mc.min.iter         = 5,
-                            mc.reps             = 20000,
-                            mc.tol              = 0.0005,
-                            mc.fixed.seed       = FALSE,
-                            mc.polyak.juditsky  = FALSE,
-                            mc.pj.extrapolate   = TRUE,
-                            mc.delta.se         = TRUE,
-                            mc.delta.jacobian.k = NULL,
-                            mc.fn.args          = list(),
-                            verbose             = interactive(),
-                            bootstrap           = FALSE,
-                            boot.ncores         = 1L,
-                            boot.parallel       = "no",
-                            boot.R              = 50L,
-                            boot.iseed          = NULL,
-                            boot.optimize       = FALSE,
-                            mc.boot.control     = list(),
-                            knn.k               = 5,
-                            reliabilities       = NULL,
-                            higherOrderLVs      = NULL) {
+                            is.lower.order         = FALSE,
+                            consistent             = TRUE,
+                            missing                = "listwise",
+                            standardize            = TRUE,
+                            ordered                = NULL,
+                            probit                 = NULL,
+                            mcpls                  = NULL,
+                            mc.fast.lmer           = NULL,
+                            tolerance              = 1e-5,
+                            max.iter.0_5           = 100,
+                            mc.max.iter            = 250,
+                            mc.min.iter            = 5,
+                            mc.reps                = 20000,
+                            mc.tol                 = 0.0005,
+                            mc.fixed.seed          = FALSE,
+                            mc.polyak.juditsky     = FALSE,
+                            mc.pj.extrapolate      = TRUE,
+                            mc.delta.se            = TRUE,
+                            mc.delta.jacobian.k    = NULL,
+                            mc.fn.args             = list(),
+                            mc.rescov              = "auto",
+                            verbose                = interactive(),
+                            bootstrap              = FALSE,
+                            boot.ncores            = 1L,
+                            boot.parallel          = "no",
+                            boot.R                 = 50L,
+                            boot.iseed             = NULL,
+                            boot.optimize          = FALSE,
+                            boot.drop.inadmissible = FALSE,
+                            mc.boot.control        = list(),
+                            knn.k                  = 5,
+                            reliabilities          = NULL,
+                            default.path.estimator = "ols",
+                            higherOrderLVs         = NULL) {
   if (is.null(parTable))
     return(NULL)
       
@@ -125,7 +156,8 @@ specifySubModel <- function(parTable,
     pj.extrapolate   = mc.pj.extrapolate,
     delta.se         = mc.delta.se,
     delta.jacobian.k = mc.delta.jacobian.k,
-    fn.args          = mc.fn.args
+    fn.args          = mc.fn.args,
+    rescov           = match.arg(mc.rescov, c("auto", "reduced", "full"))
   )
 
   boot.info <- initModelBootInfo(
@@ -134,8 +166,9 @@ specifySubModel <- function(parTable,
     parallel        = boot.parallel,
     R               = boot.R,
     iseed           = boot.iseed,
-    optimize        = boot.optimize,
-    mc.boot.control = mc.boot.control
+    optimize          = boot.optimize,
+    drop.inadmissible = boot.drop.inadmissible,
+    mc.boot.control   = mc.boot.control
   )
 
   info <- initModelInfo(
@@ -149,8 +182,30 @@ specifySubModel <- function(parTable,
     reliabilities  = reliabilities,
     is.lower.order = is.lower.order,
     mc.args        = mc.args,
-    boot           = boot.info
+    boot           = boot.info,
+    scale          = preppedData$scale
   )
+
+  thresholdStruct <- ThresholdStruct( # holds information about thresholds and
+    data = preppedData$X,             # category proportions
+    ordered = ordered
+  )
+
+  # GLS is used automatically whenever the model contains residual covariances
+  # (which the OLS path estimator cannot handle). The user may also force GLS via
+  # `default.path.estimator = "gls"`, even when OLS would otherwise suffice.
+  gls.default <- tolower(default.path.estimator) == "gls"
+
+  if (gls.default || hasResidualCovariances(parTable)) {
+    info$path.estimator <- "gls"
+    glsPathModel <- GlsPathModel(
+      parTable = pt,
+      data.cov = NULL
+    )
+  } else {
+    info$path.estimator <- "ols"
+    glsPathModel <- GlsPathModel()
+  }
 
   if (info$is.mlm && !info$is.mcpls) {
     pls_msg_note(
@@ -159,17 +214,24 @@ specifySubModel <- function(parTable,
     )
   }
 
+  pls_warnif(!info$is.mcpls && any(!is.na(pt$start)),
+    "`start()` modifiers are only relevant when `mcpls=TRUE`,",
+    "otherwise they are ignored."
+  )
+
   matrices$S  <- preppedData$S
   matrices$SC <- diagPartitioned(matrices$S, matrices$C)
 
   model <- PlsModel(
-    parTableInput = pt,
-    matrices      = matrices,
-    data          = preppedData$X,
-    info          = info,
-    status        = initModelStatus(
-      tolerance = tolerance,
-      max.iter.0_5 = max.iter.0_5
+    parTableInput    = pt,
+    matrices         = matrices,
+    data             = preppedData$X,
+    thresholdStruct  = thresholdStruct,
+    glsPathModel     = glsPathModel,
+    info             = info,
+    status           = initModelStatus(
+      tolerance      = tolerance,
+      max.iter.0_5   = max.iter.0_5
     )
   )
 
@@ -183,15 +245,34 @@ initMatrices <- function(pt, higherOrderLVs = NULL) {
 
   mode.a <- getReflectiveLVs(pt)
   mode.b <- getFormativeLVs(pt)
+  mode.c <- intersect(mode.a, mode.b)
 
-  getmode <- function(x)
-    ifelse(x %in% mode.a, yes = "A", no = ifelse(x %in% mode.b, yes = "B", no = NA))
+  # Should be handled by parseModelArguments() but we check
+  # anyways...
+  pls_stopif(length(mode.c),
+    "Constructs must be either of mode A or mode B!",
+    "Constructs with both mode A and B:",
+    paste0(mode.c, collapse = ", ")
+  )
+
+  getmode <- function(x) {
+    ifelse(x %in% mode.a,
+      yes = "A",
+      no = ifelse(x %in% mode.b,
+        yes = "B",
+        no = pls_msg_stop(
+          sprintf("Unrecognized mode for variable `%s`!", x)
+        )
+      )
+    )
+  }
 
   modes <- stats::setNames(
     vapply(lvs.linear, FUN.VALUE = character(1L), FUN = getmode),
     nm = lvs.linear
   )
 
+  checkLhsIntTerms(pt)
   etas <- unique(pt[pt$op == "~", "lhs"])
   lvs  <- c(lvs.linear, getIntTerms(pt))
   xis  <- lvs[!lvs %in% etas]
@@ -250,21 +331,50 @@ initMatrices <- function(pt, higherOrderLVs = NULL) {
   preds.cfa[, is.nlin]   <- FALSE
   succs.cfa              <- t(preds.cfa)
 
-  # Covariance xis ---------------------------------------------------------
-  xis       <- lvs[!lvs %in% pt[pt$op == "~", "lhs"]]
-  selectCov <- matrix(FALSE, nrow = length(lvs), ncol = length(lvs),
-                      dimnames = list(lvs, lvs))
+  # Covariances (lvs) ----------------------------------------------------------
+  xis <- lvs[!lvs %in% pt[pt$op == "~", "lhs"]]
+  selectCov <- matrix(
+    FALSE, nrow = length(lvs), ncol = length(lvs),
+    dimnames = list(lvs, lvs)
+  )
+
+  # defaults
   diag(selectCov) <- TRUE
   selectCov[xis, xis][lower.tri(selectCov[xis, xis])] <- TRUE
 
-  # Residual covariances ---------------------------------------------------
+  # additional (residual) covariances
+  rescov <- pt[
+    pt$op == "~~" & pt$lhs != pt$rhs & pt$lhs %in% lvs & pt$rhs %in% lvs
+    , , drop = FALSE
+  ]
+
+  for (i in seq_len(NROW(rescov))) {
+    lhs <- rescov[i, "lhs"]
+    rhs <- rescov[i, "rhs"]
+    selectCov[lhs, rhs] <- selectCov[rhs, lhs] <- TRUE
+  }
+
+  # make sure upper diagonal is not selected
+  selectCov[upper.tri(selectCov)] <- FALSE
+
+  # Residual covariances (inds) ------------------------------------------------
   k           <- length(allInds)
-  selectTheta <- matrix(FALSE, nrow = k, ncol = k,
-                        dimnames = list(allInds, allInds))
-  diag(selectTheta)     <- TRUE
-  is.formative          <- allInds %in% inds.b
-  selectTheta[outer(is.formative, is.formative, "&")] <- TRUE
-  selectTheta[upper.tri(selectTheta, diag = FALSE)]   <- FALSE
+  selectTheta <- matrix(
+    FALSE, nrow = k, ncol = k,
+    dimnames = list(allInds, allInds)
+  )
+
+  # always keep diagonal
+  diag(selectTheta) <- TRUE
+
+  # keep formative blocks
+  for (b in mode.b) {
+    idx <- indsLvs[[b]]
+    selectTheta[idx, idx] <- TRUE
+  }
+
+  # only lower.tri
+  selectTheta[upper.tri(selectTheta, diag = FALSE)] <- FALSE
 
   Ip <- diag(nrow = nrow(lambda))
   colnames(Ip) <- rownames(Ip) <- rownames(lambda)

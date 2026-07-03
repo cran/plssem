@@ -3,7 +3,7 @@ getNonZeroElems <- function(x) {
 }
 
 
-getPathCoefs <- function(y, X, C) {
+getOlsPathCoefs <- function(y, X, C) {
   # y: dependent factor
   # X: independent factors
   # C: correlation matrix
@@ -55,4 +55,11 @@ tr <- function(x) {
 isPositiveDefinite <- function(X, tol = 1e-8) {
   eigenvalues <- eigen(X, symmetric = TRUE, only.values = TRUE)$values
   all(eigenvalues > tol)
+}
+
+
+gradSymMat <- function(gX) {
+  # gX is the gradient of a matrix X, assuming the matrix X is non-symmetric
+  # here we return the gradient of X assuming X is symmetric
+  2 * gX - diag(diag(gX))
 }

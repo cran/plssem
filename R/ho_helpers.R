@@ -9,7 +9,14 @@ splitHigherOrderParTable <- function(parTable) {
     ]
 
     if (length(structOVs)) {
-      parStrO1 <- data.frame(lhs = structOVs, op = "~~", rhs = structOVs, mod = "")
+      # Carry the structural observed variables down into the first-order model
+      # so it produces their scores. We declare them as path-less structural
+      # nodes (`ADDITIONAL_STRUCT_VAR_OP`) rather than as self-covariances; the
+      # latter no longer marks a variable as structural.
+      parStrO1 <- data.frame(
+        lhs = structOVs, op = ADDITIONAL_STRUCT_VAR_OP,
+        rhs = "", mod = "", start = NA
+      )
     } else {
       parStrO1 <- NULL
     }
@@ -19,8 +26,20 @@ splitHigherOrderParTable <- function(parTable) {
     ]
     parStrO2  <- parTable[parTable$op == "~", , drop = FALSE]
 
-    parTableO2 <- rbind(parMsrO2, parStrO2)
-    parTableO1 <- rbind(parMsrO1, parStrO1)
+    # Route user-specified residual covariances (`~~` rows with distinct lhs/rhs)
+    # to the sub-model that owns at least one endpoint. The structural model lives
+    # in the higher-order (O2) table, so any covariance touching an O2 variable
+    # must travel with it. Otherwise a cross-order covariance can be stranded in
+    # the lower-order table, where the O2 construct never appears as a model node.
+    varsO2  <- unique(c(parMsrO2$lhs, parMsrO2$rhs, parStrO2$lhs, parStrO2$rhs))
+    isCov   <- parTable$op == "~~" & parTable$lhs != parTable$rhs
+    isCovO2 <- isCov & (parTable$lhs %in% varsO2 | parTable$rhs %in% varsO2)
+
+    parCovO2 <- parTable[isCovO2, , drop = FALSE]
+    parCovO1 <- parTable[isCov & !isCovO2, , drop = FALSE]
+
+    parTableO2 <- rbind(parMsrO2, parStrO2, parCovO2)
+    parTableO1 <- rbind(parMsrO1, parStrO1, parCovO1)
 
   } else {
     parTableO2 <- NULL
@@ -39,7 +58,7 @@ splitHigherOrderModel <- function(syntax) {
   pls_stopif(length(syntax) > 1L || !is.character(syntax),
              "`syntax` must be a string of length 1!")
 
-  parTable <- modsem::modsemify(syntax, parentheses.as.string = TRUE)
+  parTable <- plsParseModelSyntax(syntax)
   splitHigherOrderParTable(parTable)
 }
 
@@ -150,6 +169,11 @@ combineModelResultsFirstSecondOrder <- function(model) {
     select      = select
   )
 
+  model@parTableInput <- rbind(
+    fo@parTableInput,
+    so@parTableInput
+  )
+
   model@data     <- fo@data
   model@status   <- status
   model@fit      <- fit
@@ -227,6 +251,11 @@ computeCombinedModel <- function(model, lowerOrderAsEta = FALSE) {
     (isTRUE(info1$is.probit) || isTRUE(info2$is.probit)) && !is.mcpls
   )
 
+  # if any are GLS we select the GLS estimator, as it is more general than OLS
+  p.est.1 <- info1$path.estimator
+  p.est.2 <- info2$path.estimator
+  path.estimator <- if (p.est.1 == "gls" || p.est.2 == "gls") "gls" else p.est.2
+
   combined@info <- list(
     lvs.linear   = union(info1$lvs.linear, info2$lvs.linear),
     lvs          = union(info1$lvs, info2$lvs),
@@ -237,6 +266,8 @@ computeCombinedModel <- function(model, lowerOrderAsEta = FALSE) {
     mode.a       = union(info1$mode.a, info2$mode.a),
     mode.b       = union(info1$mode.b, info2$mode.b),
     modes        = namedListUnion(info1$modes, info2$modes),
+    inds.a       = intersect(ovInds, as.character(info1$inds.a)),
+    inds.b       = intersect(ovInds, as.character(info1$inds.b)),
     inds.x       = inds.x,
     inds.y       = inds.y,
     indsLvs      = namedListUnion(info1$indsLvs, info2$indsLvs),
@@ -254,6 +285,7 @@ computeCombinedModel <- function(model, lowerOrderAsEta = FALSE) {
     verbose      = isTRUE(info1$verbose) || isTRUE(info2$verbose),
     mc.args      = info1$mc.args,
     boot         = info1$boot,
+    scale        = info1$scale, # scale of input variables
 
     # Preserve additional fields used elsewhere.
     ordered.x      = intersect(inds.x, ordered.base),
@@ -265,11 +297,18 @@ computeCombinedModel <- function(model, lowerOrderAsEta = FALSE) {
     consistent     = info1$consistent,
     reliabilities  = info1$reliabilities,
     rng.seed       = info1$rng.seed,
+    path.estimator = path.estimator,
     is.lower.order = FALSE
   )
 
   # Ensure downstream methods see combined state.
   combined@info$is.high.ord <- TRUE
+
+  # Thresholds, only first order should ever exist...
+  combined@thresholdStruct <- fo@thresholdStruct
+  pls_warnif(length(so@thresholdStruct@ordered),
+    "Did not expect a filled thresholdStruct in the higher order model!"
+  )
 
   # Recompute parameter names using combined metadata.
   combined <- refreshModelParams(combined, update.names = TRUE)

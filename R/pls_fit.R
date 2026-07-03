@@ -1,19 +1,21 @@
 getFitPLSModel <- function(model, consistent = TRUE) {
-  lambda  <- model@matrices$lambda
-  gamma   <- model@matrices$gamma
-  preds   <- model@matrices$preds
-  etas    <- model@info$etas
-  xis     <- model@info$xis
-  lvs     <- model@info$lvs
-  lvs.lin <- model@info$lvs.linear
-  inds    <- model@info$allInds
-  inds.a  <- model@info$inds.a
-  inds.b  <- model@info$inds.b
-  indsLvs <- model@info$indsLvs
-  modes   <- model@info$modes
-  mode.a  <- model@info$mode.a
-  ptl     <- model@parTableInput
-  SC      <- model@matrices$SC
+  lambda    <- model@matrices$lambda
+  gamma     <- model@matrices$gamma
+  preds     <- model@matrices$preds
+  etas      <- model@info$etas
+  xis       <- model@info$xis
+  lvs       <- model@info$lvs
+  lvs.lin   <- model@info$lvs.linear
+  inds      <- model@info$allInds
+  inds.a    <- model@info$inds.a
+  inds.b    <- model@info$inds.b
+  indsLvs   <- model@info$indsLvs
+  modes     <- model@info$modes
+  mode.a    <- model@info$mode.a
+  mode.b    <- model@info$mode.b
+  ptl       <- model@parTableInput
+  SC        <- model@matrices$SC
+  estimator <- model@info$path.estimator
 
   fitMeasurement <- fitLambda <- fitWeights <- lambda
   fitMeasurement[TRUE] <- fitLambda[TRUE] <- fitWeights[TRUE] <- 0
@@ -47,17 +49,71 @@ getFitPLSModel <- function(model, consistent = TRUE) {
 
   fitStructural       <- gamma
   fitStructural[TRUE] <- 0
-  for (lv in lvs) {
-    predsLv <- lvs[preds[, lv, drop = TRUE]]
-    if (length(predsLv))
-      fitStructural[predsLv, lv] <- getPathCoefs(lv, predsLv, C)
-  }
 
-  fitCov     <- C
-  fitCovProj <- t(fitStructural) %*% C %*% fitStructural
-  fitCovRes  <- diag2(fitCov) - diag2(fitCovProj)
-  fitCov[etas, etas]  <- fitCovRes[etas, etas]
-  fitCov[etas, xis]   <- fitCov[xis, etas] <- 0
+  switch(estimator,
+    ols = {
+
+      # paths
+      for (lv in lvs) {
+        predsLv <- lvs[preds[, lv, drop = TRUE]]
+
+        if (length(predsLv))
+          fitStructural[predsLv, lv] <- getOlsPathCoefs(lv, predsLv, C)
+      }
+
+      # (residual) covariances
+      fitCov     <- C
+      fitCovProj <- t(fitStructural) %*% C %*% fitStructural
+      fitCovRes  <- diag2(fitCov) - diag2(fitCovProj)
+      fitCov[etas, etas]  <- fitCovRes[etas, etas]
+      fitCov[etas, xis]   <- fitCov[xis, etas] <- 0
+    },
+
+    gls = {
+      gmod <- model@glsPathModel
+
+      success <- TRUE
+      tryCatch({
+        glsModelCovMatrix(gmod) <- C # update input
+        gfit <- glsEstimateParameters(gmod) # fit model
+
+      }, error = function(e) {
+        success <<- FALSE
+        pls_msg_warn(
+          "Estimation of the structural model using GLS failed!",
+          "Attempting to use OLS instead!",
+          "Message:", conditionMessage(e)
+        )
+      })
+
+      if (!success) {
+        # switch to ols and mark as inadmissible
+        model@info$path.estimator  <- "ols"
+        model@status$is.admissible <- FALSE
+
+        return( # this is not computationally efficient, but it's simple
+          getFitPLSModel(model = model, consistent = consistent)
+        )
+      }
+
+      # paths
+      gamma <- gfit@matrices$gamma
+
+      for (lv in lvs) {
+        predsLv <- lvs[preds[, lv, drop = TRUE]]
+
+        if (length(predsLv))
+          fitStructural[predsLv, lv] <- gamma[lv, predsLv]
+      }
+
+      fitCov <- gfit@matrices$psi[rownames(C), colnames(C)]
+    },
+
+    # Shouldn't happen
+    pls_msg_stop(
+      "Unrecognized path estimator! Estimator:", estimator
+    )
+  )
 
   k        <- length(inds)
   fitTheta <- matrix(0, nrow = k, ncol = k, dimnames = list(inds, inds))
@@ -68,9 +124,12 @@ getFitPLSModel <- function(model, consistent = TRUE) {
   )
 
   fitThetaFull <- model@matrices$SC[inds, inds]
-  is.formative <- inds %in% inds.b
-  mask         <- outer(is.formative, is.formative, FUN = "&")
-  fitTheta[mask] <- fitThetaFull[mask]
+
+  # keep formative blocks
+  for (b in mode.b) {
+    idx <- indsLvs[[b]]
+    fitTheta[idx, idx] <- fitThetaFull[idx, idx]
+  }
 
   pls_warnif(any(crossLoaded),
              "Did not expect any cross loaded indicators,\n",
@@ -85,14 +144,15 @@ getFitPLSModel <- function(model, consistent = TRUE) {
   }
 
   list(
-    fitMeasurement = plssemMatrix(fitMeasurement),
-    fitStructural  = plssemMatrix(fitStructural),
-    fitCov         = plssemMatrix(fitCov, symmetric = TRUE),
-    fitTheta       = plssemMatrix(fitTheta, symmetric = TRUE),
-    fitWeights     = plssemMatrix(fitWeights),
-    fitLambda      = plssemMatrix(fitLambda),
-    fitC           = plssemMatrix(C),
-    Q              = plssemVector(Q)
+    fitMeasurement    = plssemMatrix(fitMeasurement),
+    fitStructural     = plssemMatrix(fitStructural),
+    fitCov            = plssemMatrix(fitCov, symmetric = TRUE),
+    fitTheta          = plssemMatrix(fitTheta, symmetric = TRUE),
+    fitWeights        = plssemMatrix(fitWeights),
+    fitLambda         = plssemMatrix(fitLambda),
+    fitC              = plssemMatrix(C),
+    Q                 = plssemVector(Q),
+    status.admissible = model@status$is.admissible
   )
 }
 
@@ -106,16 +166,18 @@ modelFitIsAdmissible <- function(fit) {
   )
 
   (
-    !anyNA(fit$fitWeights)       &&
-    !anyNA(fit$fitLambda)        &&
-    !anyNA(fit$fitStructural)    &&
-    !anyNA(fit$fitTheta)         &&
-    !anyNA(fit$fitCov)           &&
-    !anyNA(fit$fitC)             &&
-    isPositiveDefinite(fit$fitC) &&
-    all(diag(fit$fitTheta) >= 0) &&
-    all(diag(fit$fitCov) >= 0)   &&
-    Q.admissible
+    !anyNA(fit$fitWeights)                          &&
+    !anyNA(fit$fitLambda)                           &&
+    !anyNA(fit$fitStructural)                       &&
+    !anyNA(fit$fitTheta)                            &&
+    !anyNA(fit$fitCov)                              &&
+    !anyNA(fit$fitC)                                &&
+    isPositiveDefinite(fit$fitC)                    &&
+    all(diag(fit$fitTheta) >= 0)                    &&
+    all(diag(fit$fitCov) >= 0)                      &&
+    all(fit$fitLambda  >= -1 & fit$fitLambda  <= 1) && # weights can exceed +/- 1, but not loadings
+    Q.admissible                                    &&
+    fit$status.admissible # check flag from the input model
   )
 }
 
@@ -147,12 +209,16 @@ getParamVecNames <- function(model) {
   for (j in colnames(theta)) for (i in rownames(theta))
     theta[i, j] <- paste0(j, "~~", i)
 
-  c(lambda[selectLambda], gamma[selectGamma], psi[selectCov], theta[selectTheta])
+  thresholds <- model@thresholdStruct@thresholds
+
+  c(lambda[selectLambda], gamma[selectGamma], psi[selectCov], theta[selectTheta],
+    names(thresholds))
 }
 
 
 extractCoefs <- function(model) {
   fit <- model@fit
+  thresholdStruct <- model@thresholdStruct
 
   lambda       <- fit$fitMeasurement
   selectLambda <- model@matrices$select$lambda
@@ -166,15 +232,16 @@ extractCoefs <- function(model) {
   fitTheta    <- fit$fitTheta
   selectTheta <- model@matrices$select$theta
 
-  out <- c(
+  thr  <- thresholdStruct@thresholds
+  pars <- c(
     lambda[selectLambda],
     gamma[selectGamma],
     fitCov[selectCov],
     fitTheta[selectTheta]
   )
 
-  names(out) <- model@params$names
-  plssemVector(out)
+  names(pars) <- model@params$names[seq_along(pars)]
+  plssemVector(c(pars, thr))
 }
 
 
@@ -244,3 +311,17 @@ refreshLmerParams <- function(model) {
   model
 }
 
+
+plsMatricesLavRep <- function(object) {
+  combined <- combinedModel(object)
+  fit      <- modelFit(combined)
+
+  list(
+    lambda = fit$fitLambda,
+    wmat   = fit$fitWeights,
+    theta  = fit$fitTheta,
+    C      = fit$fitC,
+    psi    = fit$fitCov,
+    gamma  = fit$fitStructural
+  )
+}

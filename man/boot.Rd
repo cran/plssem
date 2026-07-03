@@ -3,11 +3,14 @@
 \name{boot}
 \alias{boot}
 \alias{boot,PlsModel-method}
+\alias{pls_boot,PlsModel-method}
 \title{Retrieve bootstrap coefficient matrix}
 \usage{
 boot(object)
 
 \S4method{boot}{PlsModel}(object)
+
+\S4method{pls_boot}{PlsModel}(object)
 }
 \arguments{
 \item{object}{A fitted model object.}
