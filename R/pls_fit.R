@@ -210,9 +210,29 @@ getParamVecNames <- function(model) {
     theta[i, j] <- paste0(j, "~~", i)
 
   thresholds <- model@thresholdStruct@thresholds
+  customParams <- names(model@matrices$customExpressions)
 
-  c(lambda[selectLambda], gamma[selectGamma], psi[selectCov], theta[selectTheta],
-    names(thresholds))
+  c(
+    lambda[selectLambda],
+    gamma[selectGamma],
+    psi[selectCov],
+    theta[selectTheta],
+    names(thresholds),
+    customParams
+  )
+}
+
+
+getParamVecLabels <- function(model) {
+  parTable <- addReverseCovariancesToParTable(
+    model@parTableInput
+  )
+
+  nm <- getParNamesFromParTable(parTable)
+  lab <- parTable$label
+  keep <- lab != ""
+
+  stats::setNames(lab[keep], nm = nm[keep])
 }
 
 
@@ -241,16 +261,30 @@ extractCoefs <- function(model) {
   )
 
   names(pars) <- model@params$names[seq_along(pars)]
-  plssemVector(c(pars, thr))
+
+  custom <- evalCustomExpressions(
+    pars = c(pars, thr), labels = model@params$labels,
+    expressions = model@matrices$customExpressions
+  )
+
+  plssemVector(c(pars, thr, custom))
 }
 
 
 computeFactorScores <- function(model) {
   W <- model@matrices$lambda
   X <- model@data
+
+  if (model@info$is.probit) {
+    ordered <- model@info$ordered
+
+    for (ord in ordered)
+      X[,ord] <- plsMapOrderedToExpectations(X[,ord])
+  }
+
   F <- X %*% W
 
-  if (!model@info$standardized)
+  if (!model@info$standardized || model@info$is.probit)
     F <- Rfast::standardise(F)
 
   F
@@ -275,8 +309,10 @@ getEstimatorFromInfo <- function(info) {
 
 refreshModelParams <- function(model, update.names = TRUE) {
   # Should we update names?
-  if (update.names)
+  if (update.names) {
     model@params$names <- getParamVecNames(model)
+    model@params$labels <- getParamVecLabels(model)
+  }
 
   # Single level params
   model@params$values <- extractCoefs(model)
