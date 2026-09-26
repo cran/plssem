@@ -75,40 +75,44 @@ specifyModelParTable <- function(parTable, data, higherOrderLVs = NULL, ...) {
 
 specifySubModel <- function(parTable,
                             data,
-                            is.lower.order         = FALSE,
-                            consistent             = TRUE,
-                            missing                = "listwise",
-                            standardize            = TRUE,
-                            ordered                = NULL,
-                            probit                 = NULL,
-                            mcpls                  = NULL,
-                            mc.fast.lmer           = NULL,
-                            tolerance              = 1e-5,
-                            max.iter.0_5           = 100,
-                            mc.max.iter            = 250,
-                            mc.min.iter            = 5,
-                            mc.reps                = 20000,
-                            mc.tol                 = 0.0005,
-                            mc.fixed.seed          = FALSE,
-                            mc.polyak.juditsky     = FALSE,
-                            mc.pj.extrapolate      = TRUE,
-                            mc.delta.se            = TRUE,
-                            mc.delta.jacobian.k    = NULL,
-                            mc.fn.args             = list(),
-                            mc.rescov              = "auto",
-                            verbose                = interactive(),
-                            bootstrap              = FALSE,
-                            boot.ncores            = 1L,
-                            boot.parallel          = "no",
-                            boot.R                 = 50L,
-                            boot.iseed             = NULL,
-                            boot.optimize          = FALSE,
-                            boot.drop.inadmissible = FALSE,
-                            mc.boot.control        = list(),
-                            knn.k                  = 5,
-                            reliabilities          = NULL,
-                            default.path.estimator = "ols",
-                            higherOrderLVs         = NULL) {
+                            is.lower.order                 = FALSE,
+                            consistent                     = TRUE,
+                            missing                        = "listwise",
+                            standardize                    = TRUE,
+                            ordered                        = NULL,
+                            probit                         = NULL,
+                            mcpls                          = NULL,
+                            mc.fast.lmer                   = NULL,
+                            tolerance                      = 1e-5,
+                            max.iter.0_5                   = 100,
+                            mc.max.iter                    = 250,
+                            mc.min.iter                    = 5,
+                            mc.reps                        = 20000,
+                            mc.tol                         = 0.0005,
+                            mc.fixed.seed                  = FALSE,
+                            mc.polyak.juditsky             = FALSE,
+                            mc.pj.extrapolate              = TRUE,
+                            mc.delta.se                    = TRUE,
+                            mc.delta.jacobian.k            = NULL,
+                            mc.fn.args                     = list(),
+                            mc.rescov                      = "auto",
+                            mc.diag.secant                 = FALSE,
+                            mc.small.sample                = FALSE,
+                            mc.small.sample.max.k          = 50L,
+                            mc.small.sample.point.estimate = "median",
+                            verbose                        = interactive(),
+                            bootstrap                      = FALSE,
+                            boot.ncores                    = 1L,
+                            boot.parallel                  = "no",
+                            boot.R                         = 50L,
+                            boot.iseed                     = NULL,
+                            boot.optimize                  = FALSE,
+                            boot.drop.inadmissible         = FALSE,
+                            mc.boot.control                = list(),
+                            knn.k                          = 5,
+                            reliabilities                  = NULL,
+                            default.path.estimator         = "ols",
+                            higherOrderLVs                 = NULL) {
   if (is.null(parTable))
     return(NULL)
       
@@ -157,7 +161,11 @@ specifySubModel <- function(parTable,
     delta.se         = mc.delta.se,
     delta.jacobian.k = mc.delta.jacobian.k,
     fn.args          = mc.fn.args,
-    rescov           = match.arg(mc.rescov, c("auto", "reduced", "full"))
+    rescov           = match.arg(mc.rescov, c("auto", "reduced", "full")),
+    diag.secant      = mc.diag.secant,
+    small.sample     = mc.small.sample,
+    small.sample.max.k = mc.small.sample.max.k,
+    small.sample.point.estimate = mc.small.sample.point.estimate
   )
 
   boot.info <- initModelBootInfo(
@@ -273,11 +281,12 @@ initMatrices <- function(pt, higherOrderLVs = NULL) {
   )
 
   checkLhsIntTerms(pt)
+  intTerms <- getIntTerms(pt)
   etas <- unique(pt[pt$op == "~", "lhs"])
-  lvs  <- c(lvs.linear, getIntTerms(pt))
+  lvs  <- c(lvs.linear, intTerms)
   xis  <- lvs[!lvs %in% etas]
 
-  indsLvs        <- vector("list", length(lvs))
+  indsLvs <- vector("list", length(lvs))
   names(indsLvs) <- lvs
   for (lv in lvs) {
     indsLvs[[lv]] <- pt[pt$lhs == lv & pt$op %in% c("=~", "<~"), "rhs"]
@@ -300,12 +309,21 @@ initMatrices <- function(pt, higherOrderLVs = NULL) {
   }
 
   # Gamma ------------------------------------------------------------------
-  gamma       <- matrix(0,     nrow = length(lvs), ncol = length(lvs),
-                        dimnames = list(lvs, lvs))
-  selectGamma <- matrix(FALSE, nrow = length(lvs), ncol = length(lvs),
-                        dimnames = list(lvs, lvs))
-  preds <- succs <- matrix(FALSE, nrow = length(lvs), ncol = length(lvs),
-                           dimnames = list(lvs, lvs))
+  gamma <- matrix(
+    0, nrow = length(lvs), ncol = length(lvs),
+    dimnames = list(lvs, lvs)
+  )
+  
+  selectGamma <- matrix(
+    FALSE, nrow = length(lvs), ncol = length(lvs),
+    dimnames = list(lvs, lvs)
+  )
+
+  preds <- succs <- matrix(
+    FALSE, nrow = length(lvs), ncol = length(lvs),
+    dimnames = list(lvs, lvs)
+  )
+
   for (lv in lvs) {
     predsLv <- pt[pt$lhs == lv & pt$op == "~", "rhs"]
     succsLv <- pt[pt$rhs == lv & pt$op == "~", "lhs"]
@@ -391,6 +409,30 @@ initMatrices <- function(pt, higherOrderLVs = NULL) {
   )
   higherOrderComposites <- lvs.linear[isHigherOrderComposite]
 
+  # C++ specific objects
+  modeB_Cpp <- as.integer(lvs %in% mode.b)
+  lvColIdx <- seq_along(lvs) - 1
+
+  indsIdxLVsCpp <- lapply(
+    X = indsLvs,
+    FUN = \(inds) which(allInds %in% inds) - 1
+  )
+
+  prodElemsIdxCpp <- lapply(
+    X = stringr::str_split(intTerms, pattern = ":"),
+    FUN = \(elems) vapply(
+      X = elems,
+      FUN.VALUE = integer(1L),
+      FUN = \(elem) as.integer(which(lvs == elem) - 1)
+    )
+  )
+
+  prodColIdxCpp <- vapply(
+    X = intTerms,
+    FUN.VALUE = integer(1L),
+    FUN = \(x) as.integer(which(lvs == x) - 1)
+  )
+
   matrices <- list(
     lambda       = lambda,
     gamma        = gamma,
@@ -412,7 +454,14 @@ initMatrices <- function(pt, higherOrderLVs = NULL) {
       theta    = selectTheta,
       nlinFrom = nlinSelectFrom
     ),
-    customExpressions = getCustomExpressions(pt)
+    customExpressions = getCustomExpressions(pt),
+    cpp = list(
+      indsIdxLVs   = indsIdxLVsCpp,
+      lvColIdx     = lvColIdx,
+      modeB        = modeB_Cpp,
+      prodElemsIdx = prodElemsIdxCpp,
+      prodColIdx   = prodColIdxCpp
+    )
   )
 
   info <- list(

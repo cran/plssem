@@ -1,7 +1,7 @@
 Package: plssem
 Type: Package
 Title: Complex Partial Least Squares Structural Equation Modeling
-Version: 0.1.4
+Version: 0.1.5
 Authors@R: 
     person(given = "Kjell", family = "Solem Slupphaug",
            email = "slupphaugkjell@gmail.com", role = c("aut", "cre"),
@@ -38,16 +38,16 @@ Encoding: UTF-8
 LazyData: true
 Imports: methods, stats, modsem (>= 1.0.21), lme4, lavaan, stringr,
         Rfast, collapse, mvnfast, reformulas, future, future.apply,
-        progressr, FNN, MASS, pbivnorm
+        progressr, FNN, MASS, pbivnorm, Rcpp (>= 1.1.2)
+LinkingTo: Rcpp, RcppArmadillo
 Depends: R (>= 4.1.0)
 URL: https://github.com/kss2k/plssem, https://kss2k.github.io/plssem/
 Suggests: knitr, rmarkdown, ggplot2, mice, mvtnorm, pkgload
 VignetteBuilder: knitr
-Config/roxygen2/version: 8.0.0
-RoxygenNote: 7.3.3
-NeedsCompilation: no
-Packaged: 2026-08-24 12:25:51 UTC; kss
+Config/roxygen2/version: 8.1.0
+NeedsCompilation: yes
+Packaged: 2026-09-26 11:00:33 UTC; kss
 Author: Kjell Solem Slupphaug [aut, cre] (ORCID:
     <https://orcid.org/0009-0005-8324-2834>)
 Repository: CRAN
-Date/Publication: 2026-08-24 12:50:02 UTC
+Date/Publication: 2026-09-26 11:50:02 UTC

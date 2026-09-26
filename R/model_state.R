@@ -1,12 +1,13 @@
 initModelStatus <- function(tolerance, max.iter.0_5) {
   list(
-    convergence    = FALSE,
-    iterations     = 0L,
-    iterations.0_5 = 0L,
-    tolerance      = tolerance,
-    max.iter.0_5   = max.iter.0_5,
-    is.admissible  = TRUE,
-    mcpls.update.args = NULL
+    convergence       = FALSE,
+    iterations        = 0L,
+    iterations.0_5    = 0L,
+    tolerance         = tolerance,
+    max.iter.0_5      = max.iter.0_5,
+    is.admissible     = TRUE,
+    mcpls.update.args = NULL,
+    quick             = FALSE
   )
 }
 
@@ -69,21 +70,29 @@ initModelMcArgs <- function(min.iter,
                             delta.se,
                             delta.jacobian.k,
                             fn.args,
-                            rescov = "reduced") {
+                            rescov = "reduced",
+                            diag.secant = FALSE,
+                            small.sample = FALSE,
+                            small.sample.max.k = 50L,
+                            small.sample.point.estimate = "median") {
   list(
-    min.iter         = min.iter,
-    max.iter         = max.iter,
-    mc.reps          = mc.reps,
-    tol              = tol,
-    fixed.seed       = fixed.seed,
-    polyak.juditsky  = polyak.juditsky,
-    pj.extrapolate   = pj.extrapolate,
-    delta.se         = delta.se,
-    delta.jacobian.k = delta.jacobian.k,
-    fn.args          = fn.args,
-    rescov           = rescov,
-    rng.seed         = NULL,
-    p.start          = NULL
+    min.iter                    = min.iter,
+    max.iter                    = max.iter,
+    mc.reps                     = mc.reps,
+    tol                         = tol,
+    fixed.seed                  = fixed.seed,
+    polyak.juditsky             = polyak.juditsky,
+    pj.extrapolate              = pj.extrapolate,
+    delta.se                    = delta.se,
+    delta.jacobian.k            = delta.jacobian.k,
+    fn.args                     = fn.args,
+    rescov                      = rescov,
+    diag.secant                 = diag.secant,
+    small.sample                = small.sample,
+    small.sample.max.k          = small.sample.max.k,
+    small.sample.point.estimate = small.sample.point.estimate,
+    rng.seed                    = NULL,
+    p.start                     = NULL
   )
 }
 

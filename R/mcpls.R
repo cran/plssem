@@ -1,19 +1,25 @@
 mcpls <- function(
   fit0,
-  p.start          = fit0@info$mc.args$p.start,
-  min.iter         = fit0@info$mc.args$min.iter,
-  max.iter         = fit0@info$mc.args$max.iter,
-  mc.reps          = fit0@info$mc.args$mc.reps,
-  rng.seed         = fit0@info$mc.args$rng.seed,
-  tol              = fit0@info$mc.args$tol,
-  fixed.seed       = fit0@info$mc.args$fixed.seed,
-  verbose          = fit0@info$verbose,
-  polyak.juditsky  = fit0@info$mc.args$polyak.juditsky,
-  fn.args          = fit0@info$mc.args$fn.args,
-  pj.extrapolate   = fit0@info$mc.args$pj.extrapolate,
-  delta.jacobian   = fit0@info$mc.args$delta.se && fit0@info$boot$bootstrap,
-  delta.fixed.seed = TRUE,
-  delta.jacobian.k = fit0@info$mc.args$delta.jacobian.k,
+  p.start                     = fit0@info$mc.args$p.start,
+  min.iter                    = fit0@info$mc.args$min.iter,
+  max.iter                    = fit0@info$mc.args$max.iter,
+  mc.reps                     = fit0@info$mc.args$mc.reps,
+  rng.seed                    = fit0@info$mc.args$rng.seed,
+  tol                         = fit0@info$mc.args$tol,
+  fixed.seed                  = fit0@info$mc.args$fixed.seed,
+  verbose                     = fit0@info$verbose,
+  polyak.juditsky             = fit0@info$mc.args$polyak.juditsky,
+  fn.args                     = fit0@info$mc.args$fn.args,
+  pj.extrapolate              = fit0@info$mc.args$pj.extrapolate,
+  delta.jacobian              = fit0@info$mc.args$delta.se && fit0@info$boot$bootstrap,
+  delta.fixed.seed            = TRUE,
+  delta.jacobian.k            = fit0@info$mc.args$delta.jacobian.k,
+  diag.secant                 = fit0@info$mc.args$diag.secant,
+  small.sample                = fit0@info$mc.args$small.sample,
+  small.sample.max.k          = fit0@info$mc.args$small.sample.max.k,
+  small.sample.point.estimate = fit0@info$mc.args$small.sample.point.estimate,
+  parallel                    = fit0@info$boot$parallel,
+  ncores                      = fit0@info$boot$ncores,
   ...
 ) {
   fit0.base <- fit0
@@ -26,6 +32,7 @@ mcpls <- function(
   )
 
   data      <- fit0.base@data
+  n         <- NROW(data)
   vars      <- colnames(data)
   ordered   <- fit0@info$ordered
   is.probit <- fit0@info$is.probit
@@ -44,6 +51,28 @@ mcpls <- function(
     auto    = estimator == "gls",
     pls_msg_stop("Unrecognized value for `mc.rescov` argument:", mc.rescov)
   )
+  
+  if (small.sample) {
+    pls_stopif(
+      !is.numeric(small.sample.max.k) ||
+      length(small.sample.max.k) != 1L ||
+      !is.finite(small.sample.max.k),
+      "`mc.small.sample.max.k` must be a single finite number."
+    )
+
+    max.k.int <- round(small.sample.max.k)
+
+    pls_warnif(abs(small.sample.max.k - max.k.int) > 1e-12,
+      "`mc.small.sample.max.k` should be an integer!",
+      sprintf("Using `small.sample.max.k = %d`", max.k.int)
+    )
+
+    k <- max(max.k.int, 1)
+    mc.reps <- min(k * n, max(mc.reps - mc.reps %% n, n))
+    mc.reps.k <- max(floor(mc.reps / n), 1)
+  } else {
+    mc.reps.k <- 1L
+  }
 
   par0 <- getFreeParamsTable(fit0.combined)
 
@@ -111,35 +140,57 @@ mcpls <- function(
       )
     }
 
-    sim.ov  <- ordinalizeDataFrame(
-      df = sim$ov, thresholdStruct = thresholdStruct
-    )
+    # sim.ov  <- ordinalizeDataFrame(
+    #   df = sim$ov, thresholdStruct = thresholdStruct
+    # )
+    # sim.mat <- as.matrix(sim.ov[vars])
 
     fit.sim <- fit0.base
-    X       <- Rfast::standardise(as.matrix(sim.ov[vars]))
+    modelStatusIsQuick(fit.sim) <- TRUE
 
-    if (is.probit) S <- getCorrMat(X, probit = TRUE, ordered = ordered)
-    else           S <- Rfast::cova(X)
-
-    if (!is.null(sim$cluster))
-      attr(X, "cluster") <- sim$cluster
-
-    # Update observed-data (lowest-order) model input
-    modelData(fit.sim)  <- X
-    indCorrMatrix(fit.sim) <- S
-
-    # Thresholds are not part of the root equation. Avoid recomputing them on
-    # every Robbins-Monro iteration.
-    fit2 <- estimatePLS_Inner(fit.sim)
-    par2 <- getFreeParamsTable(combinedModel(fit2))
-
-    eps <- par2$est - par0$est
     free <- par0$is.free
+    nk <- max(floor(NROW(sim$ov) / mc.reps.k), 1)
+    THETA <- matrix(NA_real_, nrow = mc.reps.k, ncol = sum(free))
 
-    out <- eps[free]
+    for (i in seq_len(mc.reps.k)) {
+      offset <- (i - 1) * nk
+      idx <- (offset+1):(offset+nk)
+
+      sim.ov  <- ordinalizeDataFrame(
+        df = sim$ov[idx,,drop=FALSE], thresholdStruct = thresholdStruct
+      )
+
+      X <- Rfast::standardise(as.matrix(sim.ov[vars]))
+
+      if (is.probit) S <- getCorrMat(X, probit = TRUE, ordered = ordered)
+      else           S <- Rfast::cova(X)
+
+      # clusters are placed in tiles of length n
+      if (!is.null(sim$cluster))
+        attr(X, "cluster") <- sim$cluster[idx,,drop=FALSE]
+
+      # Update observed-data (lowest-order) model input
+      modelData(fit.sim)  <- X
+      indCorrMatrix(fit.sim) <- S
+
+      # Thresholds are not part of the root equation. Avoid recomputing them on
+      # every Robbins-Monro iteration.
+      fit2 <- estimatePLS_Inner(fit.sim)
+      par2 <- getFreeParamsTable(combinedModel(fit2))
+
+      eps <- par2$est - par0$est
+      THETA[i, ] <- eps[free]
+    }
+
+    # which point estimate should we use?
+    out <- switch(small.sample.point.estimate,
+      mean   = colMeans(THETA, na.rm = TRUE),
+      median = colMedians(THETA, na.rm = TRUE),
+      colMeans(THETA, na.rm = TRUE) 
+    )
+
     attr(out, "lower") <- sim$lower[free]
     attr(out, "upper") <- sim$upper[free]
-
     out
   }
 
@@ -167,6 +218,27 @@ mcpls <- function(
 
     list(f = .f(p, thresholdStruct = thresholdStruct, sim = sim),
          g = .g(p, thresholdStruct = thresholdStruct, sim = sim))
+  }
+
+  # `.simulate()`, `.f()` and `.g()` read `rng.seed` from this frame. The
+  # Jacobian replicates each need their own seed, so instead of overwriting
+  # `rng.seed` here (which would not carry over to a parallel worker) we
+  # rebind the closures in a child environment holding the replicate's seed
+  mc.env <- environment()
+
+  .seedContext <- function(seed) {
+    env <- new.env(parent = mc.env)
+    env$rng.seed <- seed
+
+    for (nm in c(".simulate", ".f", ".g", ".fg")) {
+      fn <- get(nm, envir = mc.env)
+
+      # replace environment of fn before assigning it to env
+      environment(fn) <- env
+      assign(nm, fn, envir = env)
+    }
+
+    env
   }
 
   # Starting parameters
@@ -202,56 +274,77 @@ mcpls <- function(
     if (verbose) pls_msg_note("Warming up...")
 
     mcfit <- robbinsMonro1951(
-      p               = p,
-      f               = .f,
-      tol             = 10 * tol,
-      min.iter        = 5L,
-      max.iter        = 20L,
-      verbose         = verbose,
-      polyak.juditsky = FALSE,
-      fn.args         = fn.args,
-      lower           = lower,
-      upper           = upper,
+      p                = p,
+      f                = .f,
+      tol              = 10 * tol,
+      min.iter         = 5L,
+      max.iter         = 20L,
+      verbose          = verbose,
+      polyak.juditsky  = FALSE,
+      fn.args          = fn.args,
+      lower            = lower,
+      upper            = upper,
+      diag.secant      = diag.secant,
       ...
     )
 
-    p <- as.vector(mcfit$root)
+    p <- mcfit$root # keep names - `robbinsMonro1951()` relies on them for `history.f`
   }
 
   mcfit <- robbinsMonro1951(
-    p               = p,
-    f               = .f,
-    tol             = tol,
-    min.iter        = min.iter,
-    max.iter        = max.iter,
-    verbose         = verbose,
-    polyak.juditsky = polyak.juditsky,
-    fn.args         = fn.args,
-    pj.extrapolate  = pj.extrapolate,
-    lower           = lower,
-    upper           = upper,
+    p                = p,
+    f                = .f,
+    tol              = tol,
+    min.iter         = min.iter,
+    max.iter         = max.iter,
+    verbose          = verbose,
+    polyak.juditsky  = polyak.juditsky,
+    fn.args          = fn.args,
+    pj.extrapolate   = pj.extrapolate,
+    lower            = lower,
+    upper            = upper,
+    diag.secant      = diag.secant,
     ...
   )
 
   iter <- mcfit$iter
-  if (iter >= max.iter && !polyak.juditsky) {
-    pls_msg_warn(
-      "Maximum number of (initial) iterations reached!\n",
-      sprintf("Attempting to use Polyak Juditsky averaging...")
-    )
+  diverged <- mcfit$diverged
+  if ((iter >= max.iter && !polyak.juditsky) || diverged) {
 
+    if (diverged) {
+      # Might signal a non-monotone .f(). Try switching to diag.secant,
+      # which actually can account for a non-monotone .f()
+      retry.ds <- !diag.secant
+
+      pls_msg_warn(
+        "The root-finding algorithm appears to be diverging!\n",
+        "Restarting from the best point found so far, with",
+        if (retry.ds) "the diagonal-secant step method..." else "Polyak Juditsky averaging..."
+      )
+
+    } else {
+      retry.ds <- diag.secant
+
+      pls_msg_warn(
+        "Maximum number of (initial) iterations reached!\n",
+        sprintf("Attempting to use Polyak Juditsky averaging...")
+      )
+    }
+
+    start.p <- if (retry.ds) mcfit$best.p else mcfit$root
     mcfit <- robbinsMonro1951(
-      p               = as.vector(mcfit$root),
-      f               = .f,
-      tol             = tol,
-      min.iter        = min.iter,
-      max.iter        = max.iter,
-      verbose         = verbose,
-      polyak.juditsky = TRUE,
-      fn.args         = fn.args,
-      pj.extrapolate  = pj.extrapolate,
-      lower           = lower,
-      upper           = upper,
+      p                = start.p, # keep names - see the warmup retry above
+      f                = .f,
+      tol              = tol,
+      min.iter         = min.iter,
+      max.iter         = max.iter,
+      verbose          = verbose,
+      polyak.juditsky  = TRUE,
+      fn.args          = fn.args,
+      pj.extrapolate   = pj.extrapolate,
+      lower            = lower,
+      upper            = upper,
+      diag.secant      = retry.ds,
       ...
     )
 
@@ -259,7 +352,15 @@ mcpls <- function(
   }
 
   # Check status of (last) mcfit
-  if (mcfit$iter >= max.iter) {
+  if (mcfit$diverged) {
+    pls_msg_warn(
+      "The root-finding algorithm diverged and did not recover!\n",
+      "Parameter estimates might be unreliable!"
+    )
+
+    modelStatus(fit0.combined)$is.admissible <- FALSE
+
+  } else if (mcfit$iter >= max.iter) {
     pls_msg_warn(
       "Maximum number of iterations reached!\n",
       "Parameter estimates might be unreliable!"
@@ -296,67 +397,112 @@ mcpls <- function(
 
     if (verbose) pls_msg_note("Calculating Jacobian...")
 
-
-    probs0 <- thresholdStruct0@proportions
     nm <- paste0(par1$lhs, par1$op, par1$rhs)
     p0 <- stats::setNames(mcfit$root, nm[par1$is.free])
     p1 <- fit1.combined@params$values
 
-    if (verbose) {
-      pb <- utils::txtProgressBar(
-        min     = 0,
-        max     = delta.jacobian.k * (length(p) + length(probs0)),
-        initial = 0,
-        style   = 3,
-        file    = stderr()
-      )
+    # Delta-method SEs assume `p0` is close to the root.
+    history.f <- mcfit$history.f[, names(p0), drop = FALSE]
+    history.f <- history.f[stats::complete.cases(history.f), , drop = FALSE]
 
-      on.exit(close(pb), add = TRUE)
+    # Only use the tail (steady-state) half of the trajectory: the early,
+    # far-from-root iterations have their own large, systematic swings on top
+    # of MC noise, which would otherwise swamp the steady-state behaviour.
+    n.hist   <- NROW(history.f)
+    tail.idx <- ceiling(n.hist / 2):n.hist
+    tail.f   <- history.f[tail.idx, , drop = FALSE]
+    n.tail   <- NROW(tail.f)
+
+    # Successive residuals are autocorrelated (`p` moves slowly) and under
+    # `mc.fixed.seed = TRUE` consecutive iterations share the same MC error.
+    # Here we use a batch-means estimator, where we split the tail into `n.batch`
+    # blocks long enough to break the autocorrelation, and treat the block
+    # means as approximately independent replicates. Batches are kept at least
+    # `5` iterations long; with `mc.min.iter = 50` a typical run only leaves
+    # ~25 steady-state iterations, and demanding longer batches would silently
+    # disable the check. The `t` quantile below compensates for the resulting
+    # small number of batches.
+    n.batch <- max(min(floor(sqrt(n.tail)), floor(n.tail / 5L)), 0L)
+
+    if (n.batch < 3L) {
+      # Too few iterations to say anything about the steady state
+      resid     <- stats::setNames(rep(NA_real_, length(p0)), names(p0))
+      bad.resid <- rep(FALSE, length(p0))
 
     } else {
-      pb <- NULL
+      b       <- floor(n.tail / n.batch)
+      batch.f <- rowsum(
+        tail.f[seq_len(n.batch * b), , drop = FALSE],
+        group = rep(seq_len(n.batch), each = b)
+      ) / b
 
-    }
+      resid    <- colMeans(batch.f)
+      resid.se <- apply(batch.f, MARGIN = 2L, FUN = stats::sd) / sqrt(n.batch)
+      resid.se[!is.finite(resid.se)] <- Inf # not reliable
 
-    delta.jacobian.k <- delta.jacobian.k[[1L]]
-    J0 <- J1 <- Jp <- Gp <- 0
-
-    for (i in seq_len(delta.jacobian.k)) {
-
-      if (delta.fixed.seed)
-        rng.seed <- floor(stats::runif(1L, min = 0, max = 9999999))
-
-      JAC  <- calcMcJacobians(
-        .fg             = .fg,
-        .f              = .f,
-        .simulate       = .simulate,
-        p0              = p0,
-        p1              = p1,
-        thresholdStruct = thresholdStruct0,
-        lower           = lower,
-        upper           = upper,
-        progressBar     = pb,
-        k               = i
+      # Bonferroni-adjusted t-score - `n.batch` is small, so the normal
+      # quantile would be too tight
+      p.criterion <- 0.001
+      resid.tol   <- stats::qt(
+        1 - 0.5 * p.criterion / length(p0), df = n.batch - 1L
       )
 
-      J0.i <- JAC$J0
-      J1.i <- JAC$J1
-      Jp.i <- JAC$Jp
-      Gp.i <- JAC$Gp
-
-      J1 <- J1 + J1.i / delta.jacobian.k
-      J0 <- J0 + J0.i / delta.jacobian.k
-      Jp <- Jp + Jp.i / delta.jacobian.k
-      Gp <- Gp + Gp.i / delta.jacobian.k
+      # Require the residual to be both statistically and practically
+      # non-zero. With `mc.reps` large the sampling error is tiny, so a
+      # residual well inside `mc.tol` can be "significant" without mattering.
+      bad.resid <- abs(resid) > resid.tol * resid.se & abs(resid) > tol
     }
 
-    fit1.combined@params$Jacobian0 <- J0
-    fit1.combined@params$Jacobian1 <- J1
-    fit1.combined@params$JacobianProbs0 <- Jp
-    fit1.combined@params$JacobianProbs1 <- Gp
+    bad.pars <- names(p0)[bad.resid]
+    max.res  <- if (any(bad.resid)) max(abs(resid[bad.resid])) else NA_real_
+
+    pls_warnif(
+      any(bad.resid),
+      "The MC-PLS residuals did not settle around zero for:",
+      paste0(bad.pars, collapse = ", "),
+      sprintf("(largest |mean residual| = %.4g).", max.res),
+      "Delta-method standard errors might be unreliable for these parameters.",
+      "Consider decreasing `mc.tol`, increasing `mc.max.iter`, or using",
+      "bootstrap standard errors instead (`mc.delta.se = FALSE`)."
+    )
+
+    delta.jacobian.k <- delta.jacobian.k[[1L]]
+
+    if (delta.fixed.seed) {
+      seeds <- as.list(floor(stats::runif(delta.jacobian.k, min = 0, max = 9999999)))
+    } else {
+      seeds <- rep(list(rng.seed), delta.jacobian.k)
+    }
+
+    # Seed for the parallel workers. The replicate seeds are drawn above, so a
+    # given `parallel`/`ncores` setting is reproducible. Serial and parallel
+    # runs are not bit-identical though: the workers use L'Ecuyer-CMRG streams,
+    # so the simulated data sets differ (by Monte-Carlo noise only) -- the same
+    # applies to `bootstrap()`.
+    jac.iseed <- floor(stats::runif(1L, min = 0, max = 9999999))
+
+    JAC <- calcMcJacobians(
+      seedContext     = .seedContext,
+      seeds           = seeds,
+      p0              = p0,
+      p1              = p1,
+      thresholdStruct = thresholdStruct0,
+      lower           = lower,
+      upper           = upper,
+      verbose         = verbose,
+      parallel        = parallel,
+      ncores          = ncores,
+      iseed           = jac.iseed
+    )
+
+    fit1.combined@params$Jacobian0 <- JAC$J0
+    fit1.combined@params$Jacobian1 <- JAC$J1
+    fit1.combined@params$JacobianProbs0 <- JAC$Jp
+    fit1.combined@params$JacobianProbs1 <- JAC$Gp
   }
 
-  fit1.combined@params$mcpls.history <- plssemMatrix(mcfit$history)
+  fit1.combined@params$mcpls.history <- plssemMatrix(mcfit$history.p)
+  fit1.combined@params$mcpls.history.f <- plssemMatrix(mcfit$history.f)
   fit1.combined@status$par0 <- par0
   fit1.combined@status$fit0 <- fit0.base
 
@@ -370,13 +516,6 @@ mcpls <- function(
 }
 
 
-ordinalize <- function(x, probs) {
-  probs  <- sort(probs[probs < 1])
-  breaks <- collapse::fquantile(x, probs = probs)
-  findInterval(x, vec = breaks)
-}
-
-
 ordinalizeDataFrame <- function(df, thresholdStruct) {
   nm <- colnames(df)
   ordered <- thresholdStruct@ordered
@@ -385,7 +524,7 @@ ordinalizeDataFrame <- function(df, thresholdStruct) {
 
   quickdf(stats::setNames(
     lapply(nm, FUN = function(v) {
-      if (v %in% ordered) ordinalize(df[[v]], probs = probs[indices[[v]]])
+      if (v %in% ordered) ordinalizeVectorCpp(df[[v]], probs = probs[indices[[v]]])
       else df[[v]]
     }),
     nm = nm
@@ -682,19 +821,40 @@ thresholdJacobian <- function(thresholdStruct, sim.cont = NULL, eps = 1e-3,
 }
 
 
-calcMcJacobians <- function(.fg, .f, .simulate, p0, p1,
-                            thresholdStruct, lower = -Inf, upper = Inf,
-                            eps = 5e-3, progressBar = NULL, k = 1) {
+# Estimates the Jacobians used for the (implicit) delta-method standard errors.
+#
+# `seeds` holds one RNG seed per replicate, and `seedContext(seed)` returns an
+# environment with `.simulate()`, `.f()`, `.g()` and `.fg()` bound to that seed
+# (see `mcpls()`). The replicates are averaged.
+#
+# Each finite-difference column is independent of the others, so all of them
+# are evaluated through a single (optionally parallel) `plapply()` call. The
+# threshold-probability columns of a replicate share a single simulated data
+# set, so they are kept together in one task.
+calcMcJacobians <- function(seedContext,
+                            seeds,
+                            p0,
+                            p1,
+                            thresholdStruct,
+                            parallel,
+                            ncores,
+                            verbose,
+                            iseed,
+                            lower = -Inf,
+                            upper = Inf,
+                            eps   = 5e-3) {
+
   probs0 <- thresholdStruct@proportions
+  k      <- length(seeds)
 
   J0 <- matrix(
-    NA_real_,
+    0,
     nrow = length(p0), ncol = length(p0),
     dimnames = list(names(p0), names(p0))
   )
 
   J1 <- matrix(
-    NA_real_,
+    0,
     nrow = length(p1), ncol = length(p0),
     dimnames = list(names(p1), names(p0))
   )
@@ -711,25 +871,97 @@ calcMcJacobians <- function(.fg, .f, .simulate, p0, p1,
     dimnames = list(names(p1), names(probs0))
   )
 
-  for (i in seq_along(p0)) {
-    points <- boundedParameterFiniteDiffPoints(
-      x = p0, i = i, eps = eps, lower = lower, upper = upper
+  tasks.k <- function(k) {
+    par.tasks <- lapply(
+      seq_along(p0),
+      FUN = \(i) list(k = k, type = "par", index = i)
     )
 
-    fg.p <- .fg(points$plus, thresholdStruct = thresholdStruct)
-    fg.m <- .fg(points$minus, thresholdStruct = thresholdStruct)
-    J0[,i] <- (fg.p$f - fg.m$f) / points$denominator
-    J1[,i] <- (fg.p$g - fg.m$g) / points$denominator
+    if (!length(probs0)) par.tasks
+    else c(par.tasks, list(list(k = k, type = "probs")))
+  }
 
-    if (!is.null(progressBar)) {
-      utils::setTxtProgressBar(
-        progressBar, (k - 1) * (length(p0) + length(probs0)) + i
-      )
+  tasks <- unlist(
+    lapply(X = seq_len(k), FUN = tasks.k),
+    recursive = FALSE
+  )
+
+  do.task <- function(task) {
+    env <- seedContext(seeds[[task$k]])
+
+    if (task$type == "probs") {
+      return(calcMcThresholdJacobians(
+        .f              = env$.f,
+        .simulate       = env$.simulate,
+        p0              = p0,
+        p1              = p1,
+        thresholdStruct = thresholdStruct,
+        eps             = eps
+      ))
+    }
+
+    points <- boundedParameterFiniteDiffPoints(
+      x = p0, i = task$index, eps = eps, lower = lower, upper = upper
+    )
+
+    fg.p <- env$.fg(points$plus, thresholdStruct = thresholdStruct)
+    fg.m <- env$.fg(points$minus, thresholdStruct = thresholdStruct)
+
+    list(
+      J0 = (fg.p$f - fg.m$f) / points$denominator,
+      J1 = (fg.p$g - fg.m$g) / points$denominator
+    )
+  }
+
+  results <- plapply(
+    X        = tasks,
+    FUN      = do.task,
+    parallel = parallel,
+    ncores   = ncores,
+    verbose  = verbose,
+    iseed    = iseed,
+    label    = "Jacobian"
+  )
+
+  for (j in seq_along(tasks)) {
+    task <- tasks[[j]]
+    res  <- results[[j]]
+
+    if (task$type == "probs") {
+      Jp <- Jp + res$Jp / k
+      Gp <- Gp + res$Gp / k
+
+    } else {
+      J0[, task$index] <- J0[, task$index] + res$J0 / k
+      J1[, task$index] <- J1[, task$index] + res$J1 / k
+
     }
   }
 
-  offset <- length(p0)
-  sim0 <- if (length(probs0)) .simulate(p0, standardize = TRUE) else NULL
+  list(J0 = J0, J1 = J1, Jp = Jp, Gp = Gp)
+}
+
+
+# Derivatives of the root equation (`Jp`) and of the thresholds (`Gp`) with
+# respect to the category proportions, for a single replicate. All columns
+# reuse the same simulated data set.
+calcMcThresholdJacobians <- function(.f, .simulate, p0, p1, thresholdStruct,
+                                     eps = 5e-3) {
+  probs0 <- thresholdStruct@proportions
+
+  Jp <- matrix(
+    0,
+    nrow = length(p0), ncol = length(probs0),
+    dimnames = list(names(p0), names(probs0))
+  )
+
+  Gp <- matrix(
+    0,
+    nrow = length(p1), ncol = length(probs0),
+    dimnames = list(names(p1), names(probs0))
+  )
+
+  sim0 <- .simulate(p0, standardize = TRUE)
 
   for (i in seq_along(probs0)) {
     points <- boundedProbabilityFiniteDiffPoints(probs0, i = i, eps = eps)
@@ -750,26 +982,18 @@ calcMcJacobians <- function(.fg, .f, .simulate, p0, p1,
       .f(p0, thresholdStruct = T1, sim = sim0) -
       .f(p0, thresholdStruct = T0, sim = sim0)
     ) / points$denominator
-
-    if (!is.null(progressBar)) {
-      utils::setTxtProgressBar(
-        progressBar, (k - 1) * (length(p0) + length(probs0)) + offset + i
-      )
-    }
   }
 
   # Jacobian probs->thresholds
-  if (length(probs0)) {
-    # use larger eps for better numerical stability
-    T <- thresholdJacobian(thresholdStruct, sim.cont = sim0$ov, eps = 2 * eps)
+  # use larger eps for better numerical stability
+  T <- thresholdJacobian(thresholdStruct, sim.cont = sim0$ov, eps = 2 * eps)
 
-    thr.rows <- intersect(rownames(Gp), rownames(T))
-    prob.cols <- intersect(colnames(Gp), colnames(T))
+  thr.rows  <- intersect(rownames(Gp), rownames(T))
+  prob.cols <- intersect(colnames(Gp), colnames(T))
 
-    Gp[thr.rows, prob.cols] <- T[thr.rows, prob.cols, drop = FALSE]
-  }
+  Gp[thr.rows, prob.cols] <- T[thr.rows, prob.cols, drop = FALSE]
 
-  list(J0 = J0, J1 = J1, Jp = Jp, Gp = Gp)
+  list(Jp = Jp, Gp = Gp)
 }
 
 
