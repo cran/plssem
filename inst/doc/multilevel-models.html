@@ -341,66 +341,82 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 
 
-<p>This vignette shows examples of multilevel random slopes and
-intercept models, with both continuous and ordinal data.</p>
-<div id="random-slopes-model" class="section level2">
-<h2>Random Slopes Model</h2>
-<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>slopes_model <span class="ot">&lt;-</span> <span class="st">&quot;</span></span>
-<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="st">  X =~ x1 + x2 + x3</span></span>
-<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a><span class="st">  Z =~ z1 + z2 + z3</span></span>
-<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a><span class="st">  Y =~ y1 + y2 + y3</span></span>
-<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="st">  W =~ w1 + w2 + w3</span></span>
-<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a><span class="st">  Y ~ X + Z + (1 + X + Z | cluster)</span></span>
-<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a><span class="st">  W ~ X + Z + (1 + X + Z | cluster)</span></span>
+<p>This vignette shows examples of two-level (multilevel) models, with
+and without random slopes, with both continuous and ordinal data.
+Two-level models are specified with separate models for the within
+(<code>level: 1</code>) and between (<code>level: 2</code>) levels, and
+the cluster variable is given by the <code>cluster</code> argument.</p>
+<div id="two-level-model" class="section level2">
+<h2>Two-Level Model</h2>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>two_level_model <span class="ot">&lt;-</span> <span class="st">&quot;</span></span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="st">  level: 1</span></span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a><span class="st">    fw =~ y1 + y2 + y3</span></span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a><span class="st">    fw ~ x1 + x2 + x3</span></span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="st">  level: 2</span></span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a><span class="st">    fb =~ y1 + y2 + y3</span></span>
+<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a><span class="st">    fb ~ w1 + w2</span></span>
 <span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a><span class="st">&quot;</span></span></code></pre></div>
 <div id="continuous-indicators" class="section level3">
 <h3>Continuous Indicators</h3>
-<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>fit_slopes_cont <span class="ot">&lt;-</span> <span class="fu">pls</span>(</span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>  slopes_model,</span>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>fit_two_level_cont <span class="ot">&lt;-</span> <span class="fu">pls</span>(</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>  two_level_model,</span>
 <span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>  <span class="at">data      =</span> randomSlopes,</span>
-<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>  <span class="at">bootstrap =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>  <span class="at">boot.R    =</span> <span class="dv">50</span></span>
-<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>)</span>
-<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="fu">summary</span>(fit_slopes_cont)</span></code></pre></div>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>  <span class="at">cluster   =</span> <span class="st">&quot;cluster&quot;</span>,</span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>  <span class="at">bootstrap =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>  <span class="at">boot.R    =</span> <span class="dv">50</span></span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>)</span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="fu">summary</span>(fit_two_level_cont)</span></code></pre></div>
 </div>
 <div id="ordered-indicators" class="section level3">
 <h3>Ordered Indicators</h3>
-<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>fit_slopes_ord <span class="ot">&lt;-</span> <span class="fu">pls</span>(</span>
-<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>  slopes_model,</span>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>fit_two_level_ord <span class="ot">&lt;-</span> <span class="fu">pls</span>(</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>  two_level_model,</span>
 <span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>  <span class="at">data      =</span> randomSlopesOrdered,</span>
-<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>  <span class="at">bootstrap =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>  <span class="at">boot.R    =</span> <span class="dv">50</span>,</span>
-<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>  <span class="at">ordered   =</span> <span class="fu">colnames</span>(randomSlopesOrdered) <span class="co"># explicitly specify variables as ordered</span></span>
-<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>)</span>
-<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a><span class="fu">summary</span>(fit_slopes_ord)</span></code></pre></div>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>  <span class="at">cluster   =</span> <span class="st">&quot;cluster&quot;</span>,</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>  <span class="at">bootstrap =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>  <span class="at">boot.R    =</span> <span class="dv">50</span>,</span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>  <span class="at">ordered   =</span> <span class="fu">colnames</span>(randomSlopesOrdered) <span class="co"># explicitly specify variables as ordered</span></span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>)</span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a><span class="fu">summary</span>(fit_two_level_ord)</span></code></pre></div>
 </div>
 </div>
-<div id="random-intercepts-model" class="section level2">
-<h2>Random Intercepts Model</h2>
-<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>intercepts_model <span class="ot">&lt;-</span> <span class="st">&#39;</span></span>
-<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="st">  f =~ y1 + y2 + y3</span></span>
-<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="st">  f ~ x1 + x2 + x3 + w1 + w2 + (1 | cluster)</span></span>
-<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="st">&#39;</span></span></code></pre></div>
+<div id="random-slopes-model" class="section level2">
+<h2>Random Slopes Model</h2>
+<p>Random slopes are specified with <code>rv()</code> modifiers at level
+1, where the random slopes (here <code>s1</code> and <code>s2</code>)
+are variables at level 2.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>slopes_model <span class="ot">&lt;-</span> <span class="st">&#39;</span></span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="st">  level: 1</span></span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="st">    fw =~ y1 + y2 + y3</span></span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="st">    fw ~ rv(&quot;s1&quot;)*x1 + rv(&quot;s2&quot;)*x2 + x3</span></span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a><span class="st">  level: 2</span></span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a><span class="st">    fb =~ y1 + y2 + y3</span></span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a><span class="st">    fb ~ w1 + w2</span></span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a><span class="st">    # the random slopes are latent variables at the between level</span></span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a><span class="st">    s1 + s2 ~ w1 + w2</span></span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a><span class="st">&#39;</span></span></code></pre></div>
 <div id="continuous-indicators-1" class="section level3">
 <h3>Continuous Indicators</h3>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>fit_intercepts_cont <span class="ot">&lt;-</span> <span class="fu">pls</span>(</span>
-<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>  intercepts_model,</span>
-<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>  <span class="at">data      =</span> randomIntercepts,</span>
-<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>  <span class="at">bootstrap =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>  <span class="at">boot.R    =</span> <span class="dv">50</span></span>
-<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>)</span>
-<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a><span class="fu">summary</span>(fit_intercepts_cont)</span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>fit_slopes_cont <span class="ot">&lt;-</span> <span class="fu">pls</span>(</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>  slopes_model,</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>  <span class="at">data      =</span> randomSlopes,</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>  <span class="at">cluster   =</span> <span class="st">&quot;cluster&quot;</span>,</span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>  <span class="at">bootstrap =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>  <span class="at">boot.R    =</span> <span class="dv">50</span></span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>)</span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a><span class="fu">summary</span>(fit_slopes_cont)</span></code></pre></div>
 </div>
 <div id="ordered-indicators-1" class="section level3">
 <h3>Ordered Indicators</h3>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>fit_intercepts_ord <span class="ot">&lt;-</span> <span class="fu">pls</span>(</span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  intercepts_model,</span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="at">data      =</span> randomInterceptsOrdered,</span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  <span class="at">bootstrap =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>  <span class="at">boot.R    =</span> <span class="dv">50</span>,</span>
-<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>  <span class="at">ordered   =</span> <span class="fu">colnames</span>(randomInterceptsOrdered) <span class="co"># explicitly specify variables as ordered</span></span>
-<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>)</span>
-<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a><span class="fu">summary</span>(fit_intercepts_ord)</span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>fit_slopes_ord <span class="ot">&lt;-</span> <span class="fu">pls</span>(</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  slopes_model,</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="at">data      =</span> randomSlopesOrdered,</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  <span class="at">cluster   =</span> <span class="st">&quot;cluster&quot;</span>,</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>  <span class="at">bootstrap =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>  <span class="at">boot.R    =</span> <span class="dv">50</span>,</span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>  <span class="at">ordered   =</span> <span class="fu">colnames</span>(randomSlopesOrdered) <span class="co"># explicitly specify variables as ordered</span></span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>)</span>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a><span class="fu">summary</span>(fit_slopes_ord)</span></code></pre></div>
 </div>
 </div>
 
